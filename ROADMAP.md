@@ -48,14 +48,22 @@ Mise à jour à chaque version. ✅ = fait et testé · 🔧 = à corriger · �
 - ✅ Cuisine pro : carrelage métro blanc brillant, sol en carreaux orange, inox brossé, comptoir inox avec bandeau de couleur, lampes industrielles suspendues, spot chaud avec ombres.
 - ✅ Objets réels : écran des commandes (mis à jour en direct), flacons de sauce, bacs d'ingrédients (salade, tomates, cheddar, oignons), planche à découper, casserole, caisses de pommes de terre, bidon d'huile, extincteur, tabourets, poster.
 - ✅ Guirlande d'ampoules chaudes sous l'auvent (le soir), personnel en casquette aux couleurs choisies.
+### Version 2026-11-13.17 : tout en 3D + correction des bugs signalés
+- ✅ Tout en 3D : le monde 3D est l'écran principal (plein écran) ; la gestion s'ouvre dans un panneau qui glisse par-dessus (boutons ronds à droite, « 📋 Gestion », « ⬇️ Retour au jeu »).
+- ✅ Flou corrigé : la 3D est dessinée à la vraie densité de l'écran (avant : 2 pixels par point au lieu de 2,6 sur ton téléphone) ; si ça rame, les ombres se coupent avant de baisser la netteté (jamais sous 85 %) ; halo lumineux réduit.
+- ✅ Bug : 4 clients figés bras écartés (pose en T) devant la baraque après l'écran d'accueil.
+- ✅ Bug : caméra de la friterie qui coupait la pièce sur un téléphone en hauteur ; lampes qui cachaient le comptoir ; mini-carte qui cachait le tableau des prix.
+- ✅ Bug : étiquette « Ta friterie » énorme qui couvrait l'écran (maintenant plus petite et cachée de près).
+- ✅ Éblouissement blanc au milieu de la baraque réduit.
+- ✅ Performances : les personnages hors de l'écran ne sont plus dessinés.
+- ✅ Test complet automatique : 40 journées simulées, 6 onglets, 87 boutons, 10 bâtiments, postes de la friterie, sauvegarde : 0 erreur.
 
 ## 🔧 À corriger / surveiller
 - 🔧 Avertissement three.js « Texture marked for update but no image data » (existant, sans effet visible).
 - 🔧 Avertissement « parameter 'color' undefined » dans le grossiste (existant, sans effet visible).
 - 🔧 Vêtements peints sur les corps : un peu moulants (prévoir de vrais vêtements 3D).
-- 🔧 Éblouissement encore un peu fort au centre de la baraque la nuit.
 - 🔧 Écart avec les photos (jeux PC sur moteur Unreal) : continuer pièce par pièce (vrais vêtements, visages, objets de cuisine 3D sur mesure).
-- 🔧 Tester les performances sur un vrai téléphone Android d'entrée de gamme.
+- 🔧 Tester les performances sur un vrai téléphone Android : j'attends le retour du joueur (captures des bugs vus).
 
 ## 🔜 Prochaines étapes (ordre prévu)
 1. Préparation encore plus visuelle : sauce versée, pain de mitraillette garni, emballage.
