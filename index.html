@@ -182,6 +182,7 @@ const STK={
   sau:{n:'Sauces',ic:'🥫',u:'portions',pack:100,pc:13,cap:300,pn:'seau de 100 portions'},
   bev:{n:'Canettes',ic:'🥤',u:'pièces',pack:24,pc:11.5,cap:48,pn:'bac de 24'},
   pain:{n:'Pains (mitraillettes)',ic:'🥖',u:'pièces',pack:20,pc:7,cap:40,pn:'sac de 20 (2 jours)'},
+  bur:{n:'Burgers (viande + pains)',ic:'🍔',u:'pièces',pack:24,pc:26,cap:24,pn:'carton de 24'},
 };
 // Carte : r = prix de référence en Belgique (2026), use = consommation, t = type (TVA 6 % à emporter, 21 % boissons)
 const MENU={
@@ -192,7 +193,13 @@ const MENU={
   sn:{n:'Snack (fricadelle, boulette, cervelas…)',ic:'🌭',r:3.0,use:{snk:1}},
   mi:{n:'Mitraillette',ic:'🥖',r:8.5,use:{pain:1,snk:1,pdt:.2,sau:1},unl:'mi'},
   bv:{n:'Canette',ic:'🥤',r:2.3,use:{bev:1},tva:.21},
+  bu:{n:'Burger maison',ic:'🍔',r:6.5,use:{bur:1,sau:1},unl:'bu'},
+  fs:{n:'Fricadelle spéciale',ic:'🌭',r:4.3,use:{snk:1,sau:1},unl:'fs'},
 };
+// Produits à débloquer : prix d'ajout à la carte, local minimum
+const UNL={mi:{p:250,d:'Plaque et formation'},fs:{p:120,d:'Oignons frais, ketchup curry et mayo maison'},bu:{p:900,d:'Plancha, presse à steak et formation',loc:1}};
+const onMenu=k=>!MENU[k].unl||(st.unl[MENU[k].unl]&&!st.off[k]);
+const stkOn=k=>k==='pain'?onMenu('mi'):k==='bur'?onMenu('bu'):true;
 // Locaux : base = clients par jour à réputation moyenne, rent = loyer/mois, staff = places derrière le comptoir
 const LOC=[
   {n:'Baraque louée sur la place',ic:'🛖',rent:450,base:50,staff:2,stor:1,fit:0,lvl:0,d:'Une vieille baraque en tôle. Le début de tout.'},
@@ -234,9 +241,14 @@ const GOALS=[
   {k:'g2',n:'Une journée à 600 € de ventes',t:s=>s.stats.bestDay>=600},
   {k:'g3',n:'Achète une friteuse 2 bacs',t:s=>s.eq.fr2||s.eq.fr3||s.eq.fr4},
   {k:'g4',n:'Engage ton premier employé',t:s=>s.staff.length>=1},
+  {k:'h1',n:'Sers 25 clients toi-même au comptoir (🚶 Ville)',t:s=>(s.stats.hand||0)>=25},
+  {k:'h2',n:'10 fournées parfaites à la friteuse',t:s=>(s.stats.perfect||0)>=10},
+  {k:'u1',n:'Ajoute la fricadelle spéciale à la carte',t:s=>!!s.unl.fs},
   {k:'g5',n:'Réputation 60',t:s=>s.rep>=60},
   {k:'g6',n:'Contrôle AFSCA favorable',t:s=>s.stats.afscaOk>=1},
   {k:'g7',n:'Déménage dans une friterie en dur',t:s=>s.loc>=1},
+  {k:'u2',n:'Le burger maison à la carte',t:s=>!!s.unl.bu},
+  {k:'h3',n:'50 € de pourboires',t:s=>(s.stats.tips||0)>=50},
   {k:'g8',n:'10 000 clients servis',t:s=>s.stats.cli>=10000},
   {k:'g9',n:'100 000 € de chiffre d’affaires',t:s=>s.stats.ca>=100000},
   {k:'g10',n:'Friterie du centre-ville',t:s=>s.loc>=2},
@@ -251,10 +263,10 @@ const CATN={vente:'Ventes',stock:'Achats de stock',sal:'Salaires',loyer:'Loyer e
 let st=null, speed=1, curTab='fr', playing=false, acc=0;
 function defaults(){
   return {v:SCHEMA,name:'Ma friterie',uid:Math.random().toString(36).slice(2,10),day:0,h:10,cash:5000,rep:35,
-    loc:0,eq:{},stock:{pdt:50,gr:20,snk:20,sau:100,bev:24,pain:0},painD:0,
+    loc:0,eq:{},stock:{pdt:50,gr:20,snk:20,sau:100,bev:24,pain:0,bur:0},painD:0,
     price:Object.fromEntries(Object.keys(MENU).map(k=>[k,MENU[k].r])),off:{mi:1},
     oil:0,oilBad:0,clean:100,closed:[1],midi:1,soir:1,staff:[],cand:[],wx:'cloud',
-    today:{cli:0,lost:0,ca:0,sold:{},q:0},yest:null,stats:{cli:0,ca:0,days:0,bestDay:0,afscaOk:0,lost:0},
+    today:{cli:0,lost:0,ca:0,sold:{},q:0},yest:null,stats:{cli:0,ca:0,days:0,bestDay:0,afscaOk:0,lost:0,hand:0,perfect:0,tips:0},
     mon:{},lastMon:null,mv:[],log:[],goals:{},salAcc:0,tvaAcc:0,loan:null,afsca:RI(60,110),ads:{},
     neg:0,over:0,ev:null,pdtF:1,unl:{},caM:0,hist:[],shut:0,adsT:0,hLost:0,queue:0,
     adm:{},pot:'bintje',fat:'boeuf',tired:10,dec:[],decL:{},rpts:[],mHist:[],farm:0,qB:0,stag:0,fatLock:0};
@@ -341,10 +353,12 @@ function hourSim(h){
   st._vis=served;
 }
 function makeOrder(){ const S=st.stock, items=[];
-  const mitra=!st.off.mi&&st.unl.mi&&R()<.13*priceF('mi',1.3)&&S.pain>=1;
+  const mitra=onMenu('mi')&&R()<.13*priceF('mi',1.3)&&S.pain>=1;
+  const burg=!mitra&&onMenu('bu')&&R()<.17*priceF('bu',1.3)&&S.bur>=1;
   if(mitra){ items.push('mi'); }
+  else if(burg){ items.push('bu'); if(R()<.6){ items.push(R()<.5?'fp':'fm'); if(R()<.6*priceF('sa',1.1)) items.push('sa'); } }
   else{ const r=R(); items.push(r<.36?'fp':r<.76?'fm':'fg'); if(R()<.74*priceF('sa',1.1)) items.push('sa'); }
-  if(R()<.52*priceF('sn',1.2)) items.push('sn');
+  if(!burg&&R()<.52*priceF('sn',1.2)) items.push(onMenu('fs')&&R()<.38*priceF('fs',1.2)?'fs':'sn');
   if(R()<.35*priceF('bv',1.2)) items.push('bv');
   return items; }
 function sellOne(tap,order){
@@ -510,7 +524,7 @@ function buy(k,n){
 function fillAll(silent,fee){
   let tot=0;
   for(const k in STK){
-    if(k==='pain'&&(st.off.mi||!st.unl.mi)) continue;
+    if(!stkOn(k)) continue;
     const target=k==='pain'?Math.min(capOf(k),Math.ceil((st._D||60)*.14/STK.pain.pack)*STK.pain.pack):capOf(k);
     const n=Math.floor((target-st.stock[k])/STK[k].pack); if(n<1) continue;
     const pc=stkPc(k)*n*(fee?1.03:1);
@@ -563,7 +577,11 @@ const loanMax=()=>Math.round((8000+st.stats.ca*.12+st.loc*15000)/1000)*1000;
 function adFlyer(){ if(st.cash<180) return toast('Pas assez d’argent.'); mv(-180,'Toutes-boîtes (2 000 flyers)','pub'); st.adsT=st.day+14; toast('📬 Flyers distribués : +12 % de clients pendant 2 semaines.'); render(); }
 function adTog(k){ st.ads[k]=st.ads[k]?0:1; render(); }
 function unlock(k,ok){
-  if(k==='mi'){ if(!ok) return ask('Ajouter la mitraillette à la carte ?\nFormation et matériel : 250 €',()=>unlock(k,1),{ok:'Ajouter'}); if(st.cash<250) return toast('Pas assez d’argent.'); mv(-250,'Mitraillette : plaque et formation','eq'); st.unl.mi=1; st.off.mi=0; toast('🥖 La mitraillette est à la carte !'); render(); }
+  const U=UNL[k]; if(!U) return; const it=Object.keys(MENU).find(x=>MENU[x].unl===k), M=MENU[it];
+  if(U.loc&&st.loc<U.loc) return toast('Il faut d’abord un local plus grand ('+LOC[U.loc].n+').');
+  if(!ok) return ask('Ajouter à la carte : '+M.n+' ?\n'+U.d+' : '+fmt(U.p),()=>unlock(k,1),{ok:'Ajouter'});
+  if(st.cash<U.p) return toast('Pas assez d’argent.');
+  mv(-U.p,M.n+' : mise en place','eq'); st.unl[k]=1; st.off[it]=0; toast(M.ic+' '+M.n+' est à la carte !'); confetti(); render();
 }
 // Coup de main : toucher la friterie pour servir un client qui attend
 let tapT=0;
@@ -802,33 +820,59 @@ function stationUI(k){ if(k==='seau') return doClean(); if(k==='serve') return s
 // ====== Moi-même : servir les clients, cuire une fournée, nettoyer, changer la graisse (mode 3D) ======
 const waiting=()=>PPL.filter(p=>p.st===0).length;
 const CNAMES=['Kevin','Jessica','Marc','Laura','Mohamed','Sarah','Thomas','Manon','Youssef','Inès','Dylan','Julie','Pierre','Chloé','Jordan','Fatima','Luca','Océane','Arnaud','Mélissa','Bart','Els','Jean-Pierre','Martine'];
-const SAUCES=['mayonnaise','andalouse','samouraï','américaine','tartare','cocktail','brazil','pickles','ketchup curry'], SNACKS=['fricadelle','boulette sauce lapin','cervelas','viandelle','mexicano','poulycroc','brochette'], DRINKS=['Coca','Fanta','Ice Tea','Spa pétillante','Cécémel'];
-let ORD=null;
-function orderTalk(o){ const w={fp:'une petite frite',fm:'une moyenne frite',fg:'une grande frite',mi:'une mitraillette '+o.sn,sa:o.sa,sn:'une '+o.sn,bv:'un '+o.bv};
+const SAUCES=['mayonnaise','andalouse','samouraï','américaine','tartare','cocktail','brazil','pickles','ketchup curry'], SNACKS=['fricadelle','boulette sauce lapin','cervelas','viandelle','mexicano','poulycroc','brochette'], DRINKS=['Coca','Fanta','Ice Tea','Spa rouge','Cécémel'];
+let ORD=null, SRVIV=null;
+// Personnalités des clients : patience (s), pourboire, réaction
+const CTYPE={
+  hab:{n:'Habitué(e)',ic:'😊',w:24,pat:22,tip:1.2,hi:['Comme d’habitude, chef !','Salut ! Alors, ça tourne ?','Bonsoir ! Toujours aussi bonnes, tes frites ?']},
+  pre:{n:'Pressé(e)',ic:'⏱️',w:16,pat:10,tip:1.6,hi:['Vite s’il vous plaît, je suis garé en double file !','J’ai 5 minutes de pause…']},
+  etu:{n:'Étudiant(e) fauché(e)',ic:'🎒',w:14,pat:18,tip:.3,hi:['C’est la fin du mois…','Juste un petit truc, hein.']},
+  fam:{n:'Famille',ic:'👨‍👩‍👧',w:12,pat:26,tip:1.5,mul:3,hi:['Bonsoir ! C’est pour toute la famille.','Les enfants ont faim !']},
+  tou:{n:'Touriste',ic:'📸',w:9,pat:24,tip:2.2,hi:['Hello ! C’est ici les vraies frites belges ?','Bonjour ! On nous a dit que c’était le meilleur fritkot !']},
+  ouv:{n:'Ouvrier du chantier',ic:'🦺',w:14,pat:15,tip:1,hi:['Une grosse faim, patron !','Après le chantier, rien de tel !']},
+  cri:{n:'Critique gastronomique',ic:'🧐',w:4,pat:20,tip:0,hi:['Hmm. Voyons voir ce que vaut cette friterie…']},
+};
+function pickType(){ const L=Object.entries(CTYPE).filter(([k])=>k!=='cri'||st.rep>45); let r=R()*L.reduce((a,[,T])=>a+T.w,0); for(const [k,T] of L){ r-=T.w; if(r<=0) return k; } return 'hab'; }
+function orderTalk(o){ const w={fp:'une petite frite',fm:'une moyenne frite',fg:'une grande frite',mi:'une mitraillette '+o.sn,sa:o.sa,sn:'une '+o.sn,bv:'un '+o.bv,bu:'un burger maison',fs:'une fricadelle spéciale'};
   let p=[]; for(const k of o.items){ if(k==='sa') continue; if(k==='sn'&&o.items.includes('mi')) continue; p.push(w[k]); }
   let t=p.length?p[0]:''; if(o.items.includes('sa')) t+=' '+(o.items.includes('mi')?'':'avec ')+o.sa; for(let i=1;i<p.length;i++) t+=(i===p.length-1?' et ':', ')+p[i];
-  return t.charAt(0).toUpperCase()+t.slice(1)+', s’il vous plaît !'; }
-function newOrder(){ const it=makeOrder(); ORD={items:it,n:pick(CNAMES),sa:pick(SAUCES),sn:pick(SNACKS),bv:pick(DRINKS),tray:{},t0:performance.now()}; }
+  t=t.charAt(0).toUpperCase()+t.slice(1); return (o.mul>1?o.mul+' fois : ':'')+t+', s’il vous plaît !'; }
+function newOrder(){ const ty=pickType(), T=CTYPE[ty]; let it=makeOrder();
+  if(ty==='etu') it=['fp'].concat(R()<.6?['sa']:[]);
+  if(ty==='ouv'){ it=['fg','sa',onMenu('fs')&&R()<.4?'fs':'sn']; if(R()<.7) it.push('bv'); }
+  if(ty==='tou') it=onMenu('mi')&&st.stock.pain>=1?['mi']:['fg','sa'].concat(R()<.5?['bv']:[]);
+  it=[...new Set(it)];
+  ORD={items:it,ty,mul:T.mul||1,n:pick(CNAMES),sa:pick(SAUCES),sn:pick(SNACKS),bv:pick(DRINKS),hi:pick(T.hi),tray:{},t0:performance.now(),pat:T.pat*(st.tired>80?.85:1)}; }
 function serveUI(){ if(!st) return; if(!servOpen()) return toast(isOpen(st.day)?'Le service n’a pas lieu à cette heure-ci (11 h-14 h et 17 h-23 h).':'La friterie est fermée aujourd’hui.');
-  if(!waiting()&&!st.hLost) return toast('Personne au comptoir pour le moment 👍'); if(!ORD) newOrder(); snd(600); panel(serveBody); if(window.CITY&&CITY.pose) CITY.pose('Idle_Talking_Loop',1.5); }
-function trayT(k){ if(!ORD) return; ORD.tray[k]=ORD.tray[k]?0:1; snd(ORD.tray[k]?720:420); render(); }
+  if(!waiting()&&!st.hLost) return toast('Personne au comptoir pour le moment 👍'); if(!ORD) newOrder(); snd(600); openServe(); if(window.CITY&&CITY.pose) CITY.pose('Idle_Talking_Loop',1.5); }
+function openServe(){ panel(serveBody); clearInterval(SRVIV); SRVIV=setInterval(()=>{ const b=document.getElementById('patb'); if(!b||!ORD){ clearInterval(SRVIV); return; } const left=1-(performance.now()-ORD.t0)/1000/ORD.pat; b.style.width=Math.max(0,left*100)+'%'; b.style.background=left>.5?'#5fdc7a':left>.25?'#ffc928':'#ff5d57'; if(left<=0) serveLeave(); },100); }
+function serveLeave(){ const o=ORD; if(!o) return; clearInterval(SRVIV); st.rep=Math.max(0,st.rep-(o.ty==='cri'?1:.12)); const q=PPL.find(p=>p.st===0); if(q){ q.st=1; q.q=false; } snd(200);
+  toast('😤 '+o.n+' en a eu marre d’attendre et est parti(e) !'); ORD=null; if(Math.max(waiting(),st.hLost)>0&&servOpen()){ newOrder(); openServe(); } else closeModal(); }
+function trayT(k){ if(!ORD) return; ORD.tray[k]=ORD.tray[k]?0:1; snd(ORD.tray[k]?720:420); const b=document.getElementById('tr_'+k); if(b){ b.classList.toggle('s',!ORD.tray[k]); b.querySelector('i').textContent=ORD.tray[k]?'✅':''; } }
 function serveBody(){ if(!ORD) return '<div class="mut">Personne au comptoir.</div>';
-  const o=ORD, keys=['fp','fm','fg','sa','sn','bv'].concat(st.unl.mi&&!st.off.mi?['mi']:[]);
-  let h='<div class="hd">'+avatar(o.n,56)+'<div><h2 style="margin:0">🙋 '+esc(o.n)+'</h2><div class="mut sm">Client au comptoir · '+Math.max(waiting(),st.hLost)+' dans la file</div></div></div>';
-  h+='<div class="card" style="margin-top:10px;font-size:17px">💬 « '+esc(orderTalk(o))+' »</div>';
-  h+='<div class="mut sm" style="margin:6px 0">Compose le plateau puis sers. Plus tu es rapide, plus le pourboire est grand.</div><div class="tags" style="gap:8px">';
-  for(const k of keys){ const on=o.tray[k]; h+='<button class="btn sm '+(on?'':'s')+'" style="flex:1 1 30%;min-width:96px" onclick="trayT(\''+k+'\')">'+(on?'✅ ':'')+MENU[k].ic+' '+MENU[k].n.split(' (')[0]+'</button>'; }
-  h+='</div><div class="row" style="margin-top:12px"><button class="btn" onclick="serveGo()">🍟 Servir</button><button class="btn s" onclick="ORD=null;closeModal()">Plus tard</button></div>';
+  const o=ORD, T=CTYPE[o.ty], keys=['fp','fm','fg','sa','sn','fs','bu','mi','bv'].filter(k=>MENU[k]&&onMenu(k));
+  let h='<div class="hd">'+avatar(o.n,56)+'<div class="sp"><h2 style="margin:0">'+esc(o.n)+'</h2><div class="mut sm">'+T.ic+' '+T.n+' · '+Math.max(waiting(),st.hLost)+' dans la file</div></div></div>';
+  h+='<div style="height:8px;border-radius:6px;background:rgba(255,255,255,.12);margin-top:10px;overflow:hidden"><div id="patb" style="height:100%;width:100%;background:#5fdc7a;transition:width .1s linear"></div></div>';
+  h+='<div class="card" style="margin-top:10px"><div class="mut sm">« '+esc(o.hi)+' »</div><div style="font-size:17px;margin-top:6px">💬 « '+esc(orderTalk(o))+' »</div></div>';
+  h+='<div class="mut sm" style="margin:6px 0">Compose le plateau puis sers avant que la jauge de patience soit vide.</div><div class="tags" style="gap:8px">';
+  for(const k of keys){ const on=o.tray[k]; h+='<button id="tr_'+k+'" class="btn sm '+(on?'':'s')+'" style="flex:1 1 30%;min-width:96px;display:flex;align-items:center;gap:6px;justify-content:center" onclick="trayT(\''+k+'\')"><i style="font-style:normal">'+(on?'✅':'')+'</i>'+fimg(k,28)+' '+MENU[k].n.split(' (')[0]+'</button>'; }
+  h+='</div><div class="row" style="margin-top:12px"><button class="btn" onclick="serveGo()">🍟 Servir</button><button class="btn s" onclick="clearInterval(SRVIV);ORD=null;closeModal()">Plus tard</button></div>';
   return h; }
-function serveGo(){ const o=ORD; if(!o) return; const want=o.items.slice().sort().join(), got=Object.keys(o.tray).filter(k=>o.tray[k]).sort().join(); const ok=want===got, sec=(performance.now()-o.t0)/1000;
-  let sold=false; if(st.hLost>0){ sold=sellOne(1,o.items); if(sold){ st.hLost--; st.today.lost=Math.max(0,st.today.lost-1); } }
-  const q=PPL.find(p=>p.st===0); if(q){ q.st=1; q.q=false; }
-  st.tired=Math.min(100,st.tired+.12);
-  if(ok){ const tip=Math.round((sec<8?1:sec<15?.6:.3)*(.5+R())*10)/10*(sold?1:.6); st.cash+=tip; st.mon.vente=(st.mon.vente||0)+tip; st.today.tip=(st.today.tip||0)+tip; st.rep=Math.min(100,st.rep+.04); coinFx(tip); snd(880);
-    toast('👍 Parfait ! '+(sold?'Vente de plus et ':'')+'pourboire : '+fmt2(tip)); }
-  else { st.rep=Math.max(0,st.rep-.08); snd(220); toast('😕 Oups ! '+o.n+' voulait : '+o.items.map(k=>MENU[k].n.split(' (')[0].toLowerCase()).join(', ')); }
+function serveGo(){ const o=ORD; if(!o) return; clearInterval(SRVIV); const T=CTYPE[o.ty]; const want=o.items.slice().sort().join(), got=Object.keys(o.tray).filter(k=>o.tray[k]).sort().join(); const ok=want===got, sec=(performance.now()-o.t0)/1000;
+  let sold=0; for(let i=0;i<o.mul;i++) if(st.hLost>0&&sellOne(1,o.items)){ sold++; st.hLost--; st.today.lost=Math.max(0,st.today.lost-1); }
+  for(let i=0;i<o.mul;i++){ const q=PPL.find(p=>p.st===0); if(q){ q.st=1; q.q=false; } }
+  st.tired=Math.min(100,st.tired+.12); st.stats.hand=(st.stats.hand||0)+1;
+  if(ok){ const fast=sec<o.pat*.4?1:sec<o.pat*.75?.6:.3; const tip=Math.round(fast*T.tip*(.5+R())*(sold?1:.6)*o.mul*10)/10;
+    if(tip>0){ st.cash+=tip; st.mon.vente=(st.mon.vente||0)+tip; st.today.tip=(st.today.tip||0)+tip; st.stats.tips=(st.stats.tips||0)+tip; coinFx(tip); }
+    let msg='👍 Parfait ! '+(sold?(sold>1?sold+' ventes de plus':'Vente de plus')+(tip>0?' et ':''):'')+(tip>0?'pourboire : '+fmt2(tip):'');
+    if(o.ty==='cri'){ const q=quality(); if(q>=70){ st.rep=Math.min(100,st.rep+1.5); msg='🧐 Le critique adore : « Des frites d’exception ! » Réputation +1,5'; confetti(); } else if(q<55){ st.rep=Math.max(0,st.rep-1); msg='🧐 Le critique fait la grimace… (qualité '+q+'/100). Réputation −1'; } else msg='🧐 « Correct, sans plus. » Améliore la qualité pour l’impressionner.'; }
+    else st.rep=Math.min(100,st.rep+(o.ty==='hab'?.06:.04));
+    snd(880); toast(msg); }
+  else { st.rep=Math.max(0,st.rep-(o.ty==='pre'||o.ty==='cri'?.2:.08)); snd(220); toast('😕 Oups ! '+o.n+' voulait : '+o.items.map(k=>MENU[k].n.split(' (')[0].toLowerCase()).join(', ')); }
   if(window.CITY&&CITY.pose) CITY.pose('Interact',1.4);
-  ORD=null; headerOnly(); if(Math.max(waiting(),st.hLost)>0&&servOpen()){ newOrder(); panel(serveBody); } else closeModal(); }
+  ORD=null; headerOnly(); if(Math.max(waiting(),st.hLost)>0&&servOpen()){ newOrder(); openServe(); } else closeModal(); }
+// image 3D d'un produit (rendue par le moteur graphique), sinon l'émoji
+function fimg(k,sz){ const u=window.FOODIMG&&FOODIMG[k]; return u?'<img src="'+u+'" alt="" style="width:'+sz+'px;height:'+sz+'px;object-fit:contain;vertical-align:middle;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">':MENU[k].ic; }
 // Fournée à la main : sortir le panier quand les frites sont dorées
 let FRY=null;
 function fryCard(){ if(!st) return ''; const hq=st.today&&st.today.hq||0;
@@ -839,7 +883,7 @@ function fryUI(){ if(!st) return; if(st.stock.pdt<2) return toast('Plus assez de
   FRY.iv=setInterval(()=>{ FRY.t+=.05; const x=Math.min(1,FRY.t/FRY.d), k=document.getElementById('fryk'); if(!k){ clearInterval(FRY.iv); FRY=null; return; } k.style.left=(x*100)+'%'; const tt=document.getElementById('fryt'); if(tt) tt.textContent=x<FRY.lo?'🫧 Ça frit…':x<FRY.hi?'✨ Dorées ! Sors-les !':'💨 Ça commence à brûler !'; if(x>=1) fryOut(); },50); }
 function fryOut(){ if(!FRY) return; clearInterval(FRY.iv); const x=Math.min(1,FRY.t/FRY.d), lo=FRY.lo, hi=FRY.hi; FRY=null; st.tired=Math.min(100,st.tired+.2);
   if(window.CITY&&CITY.pose) CITY.pose('Interact',1.2);
-  if(x>=lo&&x<=hi){ st.today.hq=Math.min(5,(st.today.hq||0)+1); snd(880); confetti(); toast('✨ Fournée parfaite ! Qualité +1 aujourd’hui ('+st.today.hq+'/5).'); }
+  if(x>=lo&&x<=hi){ st.today.hq=Math.min(5,(st.today.hq||0)+1); st.stats.perfect=(st.stats.perfect||0)+1; snd(880); confetti(); toast('✨ Fournée parfaite ! Qualité +1 aujourd’hui ('+st.today.hq+'/5).'); }
   else if(x<lo){ snd(330); toast('🥔 Trop pâles… remets-les un peu plus longtemps la prochaine fois.'); }
   else { st.stock.pdt=Math.max(0,st.stock.pdt-2); st.oil+=1; snd(200); toast('🔥 Brûlées ! 2 kg de pommes de terre à la poubelle.'); }
   closeModal(); headerOnly(); }
@@ -916,7 +960,7 @@ function rFr(){
   h+='<div class="mut sm" style="margin-top:8px">Capacité : '+Math.round(Math.min(serveCap(),fryCap()/.36))+' clients/heure ('+(serveCap()<fryCap()/.36?'limité par le comptoir : engage du monde':'limité par la friteuse')+').</div></div>';
   // Stock rapide
   h+='<div class="card"><div class="hd"><div class="ic">📦</div><div class="sp"><h3>Stock</h3></div><button class="btn sm" onclick="fillAll()">Tout remplir</button></div><div class="tags">';
-  for(const k in STK){ if(k==='pain'&&!st.unl.mi) continue; const p=st.stock[k]/capOf(k)*100; h+='<span class="tag '+(p<20?'r':p<45?'o':'')+'">'+STK[k].ic+' '+Math.floor(st.stock[k])+' '+STK[k].u+'</span>'; }
+  for(const k in STK){ if(!stkOn(k)) continue; const p=st.stock[k]/capOf(k)*100; h+='<span class="tag '+(p<20?'r':p<45?'o':'')+'">'+STK[k].ic+' '+Math.floor(st.stock[k])+' '+STK[k].u+'</span>'; }
   h+='</div>'+(st.stock.pdt<(st._D||60)*.4?'<div class="tag r" style="margin-top:8px">⚠️ Pas assez de pommes de terre pour la journée !</div>':'')+'</div>';
   // Objectif
   const g=GOALS.find(G=>!st.goals[G.k]);
@@ -927,7 +971,7 @@ function rFr(){
 function rSt(){
   let h='<div class="card"><div class="hd"><div class="ic">🚚</div><div class="sp"><h3>Grossiste horeca</h3><div class="mut sm">Prix HTVA. Plus le local est grand, plus la réserve est grande.</div></div></div><div style="margin-top:8px"><button class="btn" onclick="fillAll()">📦 Tout remplir</button></div></div>';
   for(const k in STK){
-    const S=STK[k]; if(k==='pain'&&!st.unl.mi) continue;
+    const S=STK[k]; if(!stkOn(k)) continue;
     const c=capOf(k), p=st.stock[k]/c*100, pc=stkPc(k);
     h+='<div class="card"><div class="hd"><div class="ic">'+S.ic+'</div><div class="sp"><h3>'+S.n+'</h3><div class="mut sm">'+Math.floor(st.stock[k])+' / '+c+' '+S.u+' · '+S.pn+' : '+fmt2(pc)+(k==='pdt'&&st.pdtF>1?' <span class="tag r">mauvaise récolte</span>':'')+'</div></div></div>'+bar(p,colOf(p))+
       '<div class="row" style="margin-top:8px"><button class="btn sm" onclick="buy(\''+k+'\',1)">+1</button><button class="btn sm s" onclick="buy(\''+k+'\',5)">+5</button><button class="btn sm s" onclick="buy(\''+k+'\',99)">Remplir</button></div></div>';
@@ -939,10 +983,10 @@ function rCa(){
   let h='<div class="card"><div class="hd"><div class="ic">📋</div><div><h3>Ta carte</h3><div class="mut sm">Prix TVAC. Trop cher = moins de clients. Le prix moyen en Belgique est indiqué.</div></div></div></div>';
   for(const k in MENU){
     const M=MENU[k];
-    if(M.unl&&!st.unl[M.unl]){ h+='<div class="card"><div class="hd"><div class="ic">'+M.ic+'</div><div class="sp"><h3>'+M.n+'</h3><div class="mut sm">Pas encore à la carte.</div></div><button class="btn sm" onclick="unlock(\''+M.unl+'\')">Ajouter · 250 €</button></div></div>'; continue; }
+    if(M.unl&&!st.unl[M.unl]){ h+='<div class="card"><div class="hd"><div class="ic">'+fimg(k,40)+'</div><div class="sp"><h3>'+M.n+'</h3><div class="mut sm">Pas encore à la carte'+(UNL[M.unl].loc&&st.loc<UNL[M.unl].loc?' (il faut : '+LOC[UNL[M.unl].loc].n+')':'')+'.</div></div><button class="btn sm" onclick="unlock(\''+M.unl+'\')">Ajouter · '+fmt(UNL[M.unl].p)+'</button></div></div>'; continue; }
     const r=st.price[k]/M.r, cost=Object.entries(M.use).reduce((a,[s,u])=>a+stkPc(s)/STK[s].pack*u,0);
     const ht=st.price[k]/(1+(M.tva||.06)), mg=ht-cost;
-    h+='<div class="card"><div class="hd"><div class="ic">'+M.ic+'</div><div class="sp"><h3>'+M.n+'</h3><div class="mut sm">Moyenne belge '+fmt2(M.r)+' · coût '+fmt2(cost)+' · marge '+fmt2(mg)+'</div></div></div>'+
+    h+='<div class="card"><div class="hd"><div class="ic">'+fimg(k,40)+'</div><div class="sp"><h3>'+M.n+'</h3><div class="mut sm">Moyenne belge '+fmt2(M.r)+' · coût '+fmt2(cost)+' · marge '+fmt2(mg)+'</div></div></div>'+
       '<div class="row" style="margin-top:8px"><div class="pm"><button onclick="setPrice(\''+k+'\',-.1)">−</button><b>'+fmt2(st.price[k])+'</b><button onclick="setPrice(\''+k+'\',.1)">+</button></div><span class="tag '+(r>1.15?'r':r>1.04?'o':r<.9?'b':'g')+'">'+(r>1.15?'Très cher':r>1.04?'Un peu cher':r<.9?'Bon marché':'Prix normal')+'</span>'+(st.today.sold[k]?'<span class="mut sm">'+st.today.sold[k]+' vendus aujourd’hui</span>':'')+'</div></div>';
   }
   h+='<div class="card"><h3>👨‍🍳 Ta recette</h3><div class="mut sm">Pommes de terre :</div>'+Object.entries(POT).map(([k,P])=>'<div class="logl row"><span class="sp"><b>'+P.n+'</b> <span class="mut sm">qualité '+(P.q>0?'+':'')+P.q+' · prix ×'+P.c+'</span><br><span class="mut sm">'+P.d+'</span></span>'+(st.pot===k?'<span class="tag g">✅</span>':'<button class="btn sm s" onclick="setRec(\'pot\',\''+k+'\')">Choisir</button>')+'</div>').join('')+'<div class="mut sm" style="margin-top:8px">Graisse de cuisson :</div>'+Object.entries(FAT).map(([k,P])=>'<div class="logl row"><span class="sp"><b>'+P.n+'</b> <span class="mut sm">qualité '+(P.q>0?'+':'')+P.q+' · prix ×'+P.c+'</span><br><span class="mut sm">'+P.d+'</span></span>'+(st.fat===k?'<span class="tag g">✅</span>':'<button class="btn sm s" onclick="setRec(\'fat\',\''+k+'\')">Choisir</button>')+'</div>').join('')+'<div class="mut sm" style="margin-top:6px">Double cuisson, comme il se doit 🇧🇪</div></div>';
@@ -1453,6 +1497,52 @@ for(let i=0;i<8;i++){ const b=mesh(new THREE.CylinderGeometry(.09,.11,.9,10),iro
 // ---------- personnages ----------
 const SKINS=[0xf1c7a0,0xe0ac85,0xc68b5e,0x8d5a3b,0xf6d2b4], TOPS=[0xb83232,0x2f5fc0,0x2d8a4e,0xd8941a,0x7a46c0,0x2a2a2a,0xd8609a,0x1b8a98,0x6a4628,0xd8d8d8,0x324a6a], HAIRS=[0x2b1a10,0x5a3a1e,0x9a5f2a,0xd2aa55,0x111111,0x8a8a8a];
 const HG={leg:new THREE.CapsuleGeometry(.085,.62,4,10).translate(0,-.39,0),arm:new THREE.CapsuleGeometry(.062,.44,4,10).translate(0,-.28,0),torso:new THREE.LatheGeometry([[.01,-.3],[.15,-.3],[.172,-.22],[.16,-.08],[.175,.06],[.205,.18],[.225,.27],[.21,.33],[.15,.37],[.06,.39],[.01,.395]].map(p=>new THREE.Vector2(p[0],p[1])),28),hips:new THREE.LatheGeometry([[.01,-.08],[.16,-.1],[.19,-.04],[.19,.06],[.165,.1],[.01,.1]].map(p=>new THREE.Vector2(p[0],p[1])),24),shoulder:new THREE.SphereGeometry(.075,14,10),head:new THREE.SphereGeometry(.17,24,18),hair:new THREE.SphereGeometry(.178,24,14,0,TAU,0,Math.PI*.56),hand:new THREE.SphereGeometry(.058,12,8),shoe:new RoundedBoxGeometry(.16,.09,.28,2,.04),eye:new THREE.SphereGeometry(.024,10,8),pup:new THREE.SphereGeometry(.013,8,6),nose:new THREE.SphereGeometry(.03,10,8),neck:new THREE.CylinderGeometry(.06,.07,.12,10)};
+// ---------- nourriture en 3D (frites, sauces, snacks, mitraillette, burger, canettes) ----------
+const FOOD={}; const FG={};
+function fryGeo(){ return FG.fry||(FG.fry=new THREE.BoxGeometry(.011,.085,.011)); }
+function friesBunch(n,r,h0,spread,seed){ // bâtonnets de frites (une seule instance = un seul dessin)
+  const m=new THREE.InstancedMesh(fryGeo(),FOOD.fryM||(FOOD.fryM=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.55})),n); const o=new THREE.Object3D(), c=new THREE.Color(); let sd=seed||1; const rr=()=>{ sd=(sd*16807)%2147483647; return sd/2147483647; };
+  for(let i=0;i<n;i++){ const a=rr()*TAU, d=Math.sqrt(rr())*r; o.position.set(Math.cos(a)*d,h0+rr()*spread,Math.sin(a)*d); o.rotation.set((rr()-.5)*.7,rr()*3,(rr()-.5)*.7); const sc=.75+rr()*.5; o.scale.set(1,sc,1); o.updateMatrix(); m.setMatrixAt(i,o.matrix);
+    c.setHSL(.11+rr()*.02,.85,.5+rr()*.12); m.setColorAt(i,c); }
+  m.castShadow=true; return m; }
+function paperTex(){ return FOOD.paper||(FOOD.paper=T(canv(256,128,(x,w,h)=>{ x.fillStyle='#fbf7ee'; x.fillRect(0,0,w,h); x.fillStyle='#d8261c'; for(let i=0;i<w;i+=32){ x.fillRect(i,0,14,h); } x.fillStyle='#ffc928'; x.fillRect(0,h*.42,w,h*.16); x.fillStyle='#1a1a1a'; x.font='900 22px Nunito,Arial'; x.textAlign='center'; x.fillText('FRITES',w/2,h*.56); }))); }
+function sauceBlob(col,sc){ const g=new THREE.Group(), m=M(col,.35); for(let i=0;i<4;i++){ const b=mesh(new THREE.SphereGeometry(.026-i*.005,14,10),m); b.position.set((i%2-.5)*.012,i*.012,(i%3-1)*.008); b.scale.y=.7; g.add(b); } if(sc) g.scale.setScalar(sc); return g; }
+function canModel(col){ const g=new THREE.Group(); const lab=T(canv(128,64,(x,w,h)=>{ x.fillStyle=col; x.fillRect(0,0,w,h); x.fillStyle='rgba(255,255,255,.9)'; x.beginPath(); x.ellipse(w*.5,h*.5,w*.3,h*.22,0,0,7); x.fill(); x.fillStyle=col; x.font='900 16px Nunito,Arial'; x.textAlign='center'; x.fillText('COLA',w/2,h*.6); }));
+  const b=mesh(new THREE.CylinderGeometry(.033,.033,.11,24),new THREE.MeshStandardMaterial({map:lab,roughness:.25,metalness:.6})); b.position.y=.06; g.add(b); const t=mesh(new THREE.CylinderGeometry(.029,.033,.012,24),steel); t.position.y=.121; g.add(t); const bt=mesh(new THREE.CylinderGeometry(.033,.029,.01,24),steel); bt.position.y=.005; g.add(bt); return g; }
+function sauceLine(g,col,y,ph,len){ len=len||.13; const pts=[]; for(let i=0;i<=10;i++){ const t=i/10; pts.push(new V3(-len/2+t*len,y,Math.sin(t*Math.PI*5+ph*6)*.018)); } const m=mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),60,.0045,6),M(col,.3)); m.scale.y=.6; m.position.y=y*.4; g.add(m); }
+function foodModel(k){ const g=new THREE.Group();
+  if(k==='fp'||k==='fm'||k==='fg'){ const s={fp:.8,fm:1,fg:1.18}[k]; const cone=mesh(new THREE.CylinderGeometry(.068*s,.03*s,.17*s,28,1,true),new THREE.MeshStandardMaterial({map:paperTex(),roughness:.85,side:THREE.DoubleSide})); cone.position.y=.085*s; g.add(cone);
+    g.add(friesBunch(Math.round(46*s),.052*s,.1*s,.07*s,7)); }
+  else if(k==='sa'){ const pot=mesh(new THREE.CylinderGeometry(.034,.026,.035,24,1,true),M(0xffffff,.4,0,{side:THREE.DoubleSide})); pot.position.y=.018; g.add(pot); const f=mesh(new THREE.CylinderGeometry(.031,.031,.004,24),M(0xe8762a,.3)); f.position.y=.03; g.add(f); const b=sauceBlob(0xe8762a,.8); b.position.y=.03; g.add(b); }
+  else if(k==='sn'||k==='fs'){ const tray=mesh(new THREE.BoxGeometry(.2,.025,.075),M(0xf2ead8,.9)); tray.position.y=.012; g.add(tray);
+    const fr=mesh(new THREE.CapsuleGeometry(.018,.15,6,12),M(0x7a3c1a,.6)); fr.rotation.z=Math.PI/2; fr.position.y=.042; g.add(fr);
+    if(k==='fs'){ sauceLine(g,0xfff3c0,.064,.0); sauceLine(g,0xa8261a,.07,.5); for(let i=0;i<18;i++){ const o=mesh(new THREE.BoxGeometry(.009,.006,.009),M(0xf4f0e0,.6)); o.position.set((Math.random()-.5)*.13,.066+Math.random()*.01,(Math.random()-.5)*.03); g.add(o); } } }
+  else if(k==='mi'){ const crust=M(0xc98a3a,.7), crumb=M(0xf3e2b8,.9);
+    const b1=mesh(new THREE.CapsuleGeometry(.03,.21,8,16),crust); b1.rotation.z=Math.PI/2; b1.scale.set(1,1,.85); b1.position.y=.026; g.add(b1); const in1=box(.22,.004,.05,crumb); in1.position.y=.05; g.add(in1);
+    const top=mesh(new THREE.CapsuleGeometry(.03,.21,8,16),crust); top.rotation.set(-.9,0,Math.PI/2); top.scale.set(1,.6,.85); top.position.set(0,.075,-.045); g.add(top);
+    const fr=mesh(new THREE.CapsuleGeometry(.016,.17,6,12),M(0x7a3c1a,.6)); fr.rotation.z=Math.PI/2; fr.position.set(0,.064,.008); g.add(fr);
+    const fw=new THREE.Group(); const fb=friesBunch(34,.022,-.01,.02,5); fb.scale.set(1,2.1,1); fw.add(fb); fw.rotation.z=Math.PI/2; fw.position.set(0,.082,.0); g.add(fw);
+    sauceLine(g,0xfff3c0,.1,.2,.18); }
+  else if(k==='bu'){ const bun=M(0xc8842e,.6); const b0=mesh(new THREE.CylinderGeometry(.055,.052,.022,28),bun); b0.position.y=.011; g.add(b0);
+    const pat=mesh(new THREE.CylinderGeometry(.058,.058,.02,28),M(0x4a2512,.8)); pat.position.y=.032; g.add(pat);
+    const ch=mesh(new THREE.BoxGeometry(.1,.004,.1),M(0xffb81c,.4)); ch.position.y=.044; ch.rotation.y=.4; g.add(ch);
+    const sal=mesh(new THREE.CylinderGeometry(.062,.06,.006,10),M(0x5aa02c,.6)); sal.position.y=.05; g.add(sal); const to=mesh(new THREE.CylinderGeometry(.048,.048,.008,20),M(0xd8261c,.4)); to.position.y=.056; g.add(to);
+    const tp=mesh(new THREE.SphereGeometry(.058,28,14,0,TAU,0,Math.PI/2),bun); tp.scale.y=.62; tp.position.y=.06; g.add(tp);
+    for(let i=0;i<16;i++){ const a=i*2.4, r=.012+(i%5)*.008; const se=mesh(new THREE.SphereGeometry(.004,6,4),M(0xfff4d0,.5)); se.scale.set(1,.5,1.6); se.position.set(Math.cos(a)*r,.06+Math.sqrt(.058*.058-r*r)*.62,Math.sin(a)*r); g.add(se); } }
+  else if(k==='bv'){ const c=canModel('#c8102e'); c.rotation.y=-1.2; g.add(c); }
+  return g; }
+// images des produits pour l'interface (rendu 3D une seule fois, fond transparent)
+function foodIcons(){ try{ const sc=new THREE.Scene(); sc.environment=pmrem.fromScene(new RoomEnvironment(),.04).texture; const kl=new THREE.DirectionalLight(0xfff0dd,2.2); kl.position.set(1,2,1.5); sc.add(kl); sc.add(new THREE.AmbientLight(0xffffff,.3));
+  const cm=new THREE.PerspectiveCamera(28,1,.01,10), S=128, rt=new THREE.WebGLRenderTarget(S,S,{samples:4}); rt.texture.colorSpace=THREE.SRGBColorSpace; const buf=new Uint8Array(S*S*4), cv=document.createElement('canvas'); cv.width=cv.height=S; const cx=cv.getContext('2d'), id=cx.createImageData(S,S);
+  const out={}, oc=RD.getClearAlpha(), occ=RD.getClearColor(new THREE.Color());
+  for(const k in MENU){ const m=foodModel(k); sc.add(m); const b=new THREE.Box3().setFromObject(m), c=b.getCenter(new V3()), r=b.getSize(new V3()).length()*.5;
+    cm.position.set(c.x+r*1.7,c.y+r*1.5,c.z+r*2.9); cm.lookAt(c); RD.setRenderTarget(rt); RD.setClearColor(0,0); RD.clear(); RD.render(sc,cm); RD.readRenderTargetPixels(rt,0,0,S,S,buf);
+    for(let y=0;y<S;y++) id.data.set(buf.subarray((S-1-y)*S*4,(S-y)*S*4),y*S*4); cx.putImageData(id,0,0); out[k]=cv.toDataURL('image/png'); sc.remove(m); }
+  RD.setRenderTarget(null); RD.setClearColor(occ,oc); rt.dispose(); window.FOODIMG=out; if(typeof render==='function'&&st&&playing) render(); }catch(e){ console.warn('icônes',e); } }
+// vapeur au-dessus des friteuses
+const STEAMT=T(canv(64,64,(x,w,h)=>{ const g=x.createRadialGradient(32,32,2,32,32,30); g.addColorStop(0,'rgba(255,255,255,.55)'); g.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=g; x.fillRect(0,0,w,h); }));
+function steamAt(parent,x,y,z,n,spread){ const arr=[]; for(let i=0;i<n;i++){ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:STEAMT,transparent:true,depthWrite:false,opacity:0})); sp.userData={x:x+(Math.random()-.5)*spread,y,z,t:Math.random()*3}; parent.add(sp); arr.push(sp); } return arr; }
+function steamTick(arr,dt,on){ for(const sp of arr){ const u=sp.userData; u.t+=dt; if(u.t>3) u.t=0; const k=u.t/3; sp.position.set(u.x+Math.sin(u.t*2+u.x*9)*.08*k,u.y+k*1.1,u.z); sp.scale.setScalar(.25+k*.7); sp.material.opacity=on?Math.sin(k*Math.PI)*.35:0; } }
 // ---------- vrais personnages animés (Quaternius « Universal Base Characters » + « Universal Animation Library », CC0) ----------
 // Corps réaliste + animations (marcher, courir, servir, manger…). Vêtements peints dans la texture selon l'os de chaque triangle.
 const CH={ok:false,wait:[],clips:{},base:{},hair:{},tex:{},hm:{}};
@@ -1618,13 +1708,13 @@ function buildKot(){
   g.position.set(FP.x,0,FP.z); CS.add(g);
   const sol={x0:FP.x-W/2,x1:FP.x+W/2,z0:FP.z-D/2,z1:FP.z+D/2}; SOLID.push(sol);
   const hot={x:FP.x+W/2+.9,z:FP.z-D/2+.75,r:1.5,k:'kot',act:'enter',label:'🚪 Entrer dans ta friterie'}; HOT.push(hot);
-  g.userData={sol,hot,W,H,D,y0}; kotG=g; DOORS.kot={x:hot.x,z:hot.z};
+  g.userData={sol,hot,W,H,D,y0,steam:steamAt(g,-W/4,y0+H+.1,-D/4,8,.5)}; kotG=g; DOORS.kot={x:hot.x,z:hot.z};
   if(!kotG.lbl) kotG.lbl=label('🍟 Ta friterie',FP.x,FP.z,H+y0+2.6); else kotG.lbl.position.y=H+y0+2.6;
   const kl=CS.userData.kotLight||(CS.userData.kotLight=new THREE.PointLight(0xffc070,0,14,2)); kl.position.set(FP.x,y0+2.4,FP.z+D/2+1.2); CS.add(kl);
 }
 // clients (suivent la vraie file PPL du jeu) et passants
 const POOL=[]; for(let i=0;i<16;i++){ const m=human({skin:SKINS[i%5],top:TOPS[(i*5)%TOPS.length],hair:HAIRS[(i*2)%6],fem:i%2===0,pants:[0x2b3550,0x3a3a3a,0x5a4a3a][i%3]}); m.visible=false; CS.add(m);
-  const bx=new THREE.Group(); const bb=box(.2,.16,.14,M(0xc81e1e,.6)); bx.add(bb); for(let k=0;k<6;k++){ const f=box(.03,.17,.03,M(0xffcc33,.6)); f.position.set(-.06+k*.025,.13,(k%2)*.03-.015); bx.add(f); } bx.position.set(0,-.55,.12); m.userData.aR.add(bx); m.userData.fries=bx; pose(m,['Idle_Loop','Idle_FoldArms_Loop','Idle_TalkingPhone_Loop','Idle_Loop'][i%4]); POOL.push(m); }
+  const bx=foodModel(i%3?'fm':'fg'); bx.position.set(0,-.62,.1); m.userData.aR.add(bx); m.userData.fries=bx; pose(m,['Idle_Loop','Idle_FoldArms_Loop','Idle_TalkingPhone_Loop','Idle_Loop'][i%4]); POOL.push(m); }
 const PM=new Map();
 const PEDS=[]; const LOOP=[[-17,-14],[17,-14],[17,14],[3,14],[2.5,44],[-2.5,44],[-3,14],[-17,14]];
 for(let i=0;i<10;i++){ const m=human({skin:SKINS[(i+2)%5],top:TOPS[(i*7)%TOPS.length],hair:HAIRS[(i+1)%6],fem:i%3===0}); m.userData.s=i/10; m.userData.v=.006+Math.random()*.003; CS.add(m); PEDS.push(m); }
@@ -1639,7 +1729,7 @@ const IS=new THREE.Scene(); IS.background=new THREE.Color(0x0e0905); IS.environm
 const ihemi=new THREE.HemisphereLight(0xfff4e0,0x6a5a48,.15); IS.add(ihemi);
 const ilight=new THREE.DirectionalLight(0xfff0dd,.9); ilight.position.set(3,9,6); ilight.castShadow=!!Q.sh; if(Q.sh){ ilight.shadow.mapSize.set(1024,1024); Object.assign(ilight.shadow.camera,{left:-10,right:10,top:10,bottom:-10}); ilight.shadow.bias=-.0005; } IS.add(ilight);
 const ipl=[0,1].map(()=>{ const l=new THREE.PointLight(0xfff0d8,5,12,2); IS.add(l); return l; });
-let ROOM=null, RSOL=[], RHOT=[], RNPC=[], RCUS=[], RW=10, RDp=8;
+let ROOM=null, RSOL=[], RHOT=[], RNPC=[], RCUS=[], RSTEAM=[], RW=10, RDp=8; const onMenuS=k=>st&&onMenu(k);
 const fridgeGlass=new THREE.MeshStandardMaterial({color:0x9fd0ff,roughness:.05,metalness:.2,transparent:true,opacity:.35,emissive:0x6aa8e0,emissiveIntensity:.25});
 function poster(lines,bgc){ return new THREE.MeshStandardMaterial({roughness:.5,map:T(canv(256,320,(x,w,h)=>{ x.fillStyle=bgc||'#fff'; x.fillRect(0,0,w,h); x.fillStyle='#1f3a7f'; x.fillRect(0,0,w,64); x.fillStyle='#fff'; x.font='900 28px Nunito,Arial'; x.textAlign='center'; x.fillText(lines[0],w/2,42); x.fillStyle='#333'; x.font='700 21px Nunito,Arial'; lines.slice(1).forEach((l,i)=>x.fillText(l,w/2,110+i*36)); }))}); }
 function roomShell(W,D,H,wallC,floorM){
@@ -1687,7 +1777,7 @@ function grosRoom(){
   for(let i=0;i<3;i++){ const g=new THREE.Group(); const pal=box(1.2,.15,1,woodM); pal.position.y=.07; g.add(pal); for(let j=0;j<4;j++){ const sac=rbox(.5,.3,.8,.12,M(0x9a7a4a,.95)); sac.position.set((j%2-.5)*.55,.3+Math.floor(j/2)*.3,0); g.add(sac);} addS(g,-6.5,2+i*1.4,1.2,1); }
   RHOT.push({x:5,z:3.5,r:1.4,act:'talk',k:'gros',label:'💬 Parler à '+OFF.gros.who}); }
 function menuBoard(){ const s=S(); return new THREE.MeshStandardMaterial({roughness:.5,emissive:0xffffff,emissiveIntensity:.05,map:T(canv(1024,512,(x,w,h)=>{ x.fillStyle='#141414'; x.fillRect(0,0,w,h); x.strokeStyle='#8a5a2a'; x.lineWidth=20; x.strokeRect(10,10,w-20,h-20); x.fillStyle='#ffd23f'; x.font='900 60px Nunito,Arial'; x.textAlign='center'; x.fillText('🍟 '+s.name,w/2,84); x.font='700 42px Nunito,Arial';
-  const ks=Object.keys(MENU).filter(k=>!MENU[k].unl||(s.unl||{})[MENU[k].unl]); ks.forEach((k,i)=>{ const col=i%2, r=Math.floor(i/2); x.textAlign='left'; x.fillStyle='#fff'; x.fillText(MENU[k].n.split(' (')[0],46+col*500,170+r*80); x.textAlign='right'; x.fillStyle='#ffd23f'; x.fillText(((s.price||{})[k]||MENU[k].r).toFixed(2).replace('.',',')+' €',470+col*500,170+r*80); }); }))}); }
+  const ks=Object.keys(MENU).filter(k=>!MENU[k].unl||((s.unl||{})[MENU[k].unl]&&!(s.off||{})[k])), rows=Math.ceil(ks.length/2), rh=Math.min(80,(h-150)/rows); x.font='700 '+Math.round(Math.min(42,rh*.55))+'px Nunito,Arial'; ks.forEach((k,i)=>{ const col=i%2, r=Math.floor(i/2), y=160+r*rh; x.textAlign='left'; x.fillStyle='#fff'; x.fillText(MENU[k].n.split(' (')[0],46+col*500,y,300); x.textAlign='right'; x.fillStyle='#ffd23f'; x.fillText(((s.price||{})[k]||MENU[k].r).toFixed(2).replace('.',',')+' €',470+col*500,y); }); }))}); }
 let fxx=0;
 function kotRoom(){
   const s=S(), L=s.loc, W=[5.5,7.5,9.5,13][L], D=[4.5,6,7,9][L];
@@ -1696,12 +1786,13 @@ function kotRoom(){
   const reg=rbox(.45,.28,.4,.03,M(0x222222,.4)); reg.position.set(W/2-1.6,1.24,0); const creal=mdl('CashRegister_01',W/2-1.6,1.1,0,Math.PI,.8); if(creal){ ct.add(creal); } else ct.add(reg); const scr=box(.38,.2,.01,new THREE.MeshStandardMaterial({color:0,emissive:0x5fdc7a,emissiveIntensity:1.5}),false); scr.position.set(W/2-1.6,1.45,-.15); scr.rotation.x=-.3; ct.add(scr);
   for(let i=0;i<5;i++){ const bt=mesh(new THREE.CylinderGeometry(.055,.055,.24,12),M([0xf4e04a,0xe8742a,0xc8102e,0xf8f0d0,0x5a3a10][i],.25)); bt.position.set(-W/2+1.4+i*.18,1.22,.12); ct.add(bt); }
   const cones=new THREE.Group(); for(let i=0;i<6;i++){ const c=mesh(new THREE.ConeGeometry(.07,.22,12,1,true),M(0xffffff,.8,0,{side:THREE.DoubleSide})); c.rotation.x=Math.PI; c.position.set(i*.05,i*.04,0); cones.add(c); } cones.position.set(-W/2+2.5,1.25,0); ct.add(cones);
+  { const ks=['fm','fg','sa',onMenuS('fs')?'fs':'sn'].concat(onMenuS('mi')?['mi']:[],onMenuS('bu')?['bu']:[]); ks.forEach((k,i)=>{ const f=foodModel(k); f.position.set(-W/2+2.95+i*.2,1.095,.16); f.rotation.y=-.3; ct.add(f); }); for(let i=0;i<3;i++){ const c=foodModel('bv'); c.position.set(-W/2+1.5+i*.09,1.095,-.18); ct.add(c); } }
   addS(ct,-.4,D/2-1.6,W-1.6,.6);
   const nb=s.eq.fr4?4:s.eq.fr3?3:s.eq.fr2?2:1, fw=nb*.72+.3, fry=new THREE.Group(); const fb=rbox(fw,.95,.78,.02,steel); fb.position.y=.47; fry.add(fb);
   const oilM=new THREE.MeshStandardMaterial({color:(s.oil||0)/oilLife()>1?0x4a2a08:0xd89a20,roughness:.05,metalness:.2,emissive:0x3a2000,emissiveIntensity:.4});
   for(let i=0;i<nb;i++){ const oil=box(.56,.02,.52,oilM,false); oil.position.set(-fw/2+.51+i*.72,.955,0); fry.add(oil); const bk=new THREE.Group(); const bkb=box(.42,.22,.36,M(0x888888,.4,.9,{wireframe:true})); bk.add(bkb); const hd=box(.06,.04,.4,M(0x111111,.5)); hd.position.set(0,.05,.36); bk.add(hd); bk.position.set(-fw/2+.51+i*.72,1.12,.04); fry.add(bk); }
   const hood=rbox(fw+.5,.45,.7,.03,steel); hood.position.set(0,2.55,-.15); fry.add(hood);
-  fxx=-W/2+1.05+fw/2; addS(fry,fxx,-D/2+.45,fw,.78);
+  fxx=-W/2+1.05+fw/2; addS(fry,fxx,-D/2+.45,fw,.78); RSTEAM=steamAt(ROOM,fxx,1.05,-D/2+.45,10,fw*.8);
   const fr=new THREE.Group(); const f1=rbox(.8,1.95,.72,.03,M(0xe8eef2,.3,.3)); f1.position.y=.97; fr.add(f1); const fg=box(.68,1.6,.02,fridgeGlass,false); fg.position.set(0,1.02,.37); fr.add(fg);
   for(let lv=0;lv<3;lv++) for(let i=0;i<4;i++){ const cn=mesh(new THREE.CylinderGeometry(.035,.035,.12,10),M([0xc8102e,0x2a64c9,0x2d8a4e,0xffc928][i],.3,.6)); cn.position.set(-.22+i*.15,.6+lv*.45,.15); fr.add(cn); } addS(fr,-W/2+.5,-D/2+.45,.8,.72);
   const sh=new THREE.Group(); for(let lv=0;lv<3;lv++){ const p=box(1.2,.04,.35,woodM); p.position.y=1+lv*.45; sh.add(p); for(let i=0;i<5;i++){ const b=mesh(new THREE.CylinderGeometry(.065,.065,.28,12),M([0xf4e04a,0xe8742a,0xc8102e,0xf8f0d0,0x5a3a10][(i+lv)%5],.25)); b.position.set(-.45+i*.22,1.16+lv*.45,0); sh.add(b);} } sh.position.set(W/2-.25,0,-D/2+1.4); sh.rotation.y=-Math.PI/2; ROOM.add(sh);
@@ -1715,7 +1806,7 @@ function kotRoom(){
   RHOT.push({x:-1.1,z:D/2-2.25,r:.9,act:'st',k:'serve',label:'🙋 Servir les clients'});
   RCUS=[]; for(let i=0;i<3;i++){ const m=human({skin:SKINS[(i*3+1)%5],top:TOPS[(i*4+2)%TOPS.length],hair:HAIRS[(i*5)%6],fem:i===1,pants:[0x2b3550,0x3a3a3a,0x5a4a3a][i]}); m.position.set(-1.1-i*.75,0,D/2-1.0+i*.12); m.rotation.y=Math.PI+(i?.25:0); pose(m,['Idle_Loop','Idle_TalkingPhone_Loop','Idle_FoldArms_Loop'][i]); m.visible=false; ROOM.add(m); RCUS.push(m); }
   RHOT[0].z=D/2-.5; }
-function enter(k){ if(ROOM) IS.remove(ROOM); RNPC=[]; RCUS=[]; P.ret={x:P.x,z:P.z,yaw:P.yaw}; if(k==='kot') kotRoom(); else officeRoom(k);
+function enter(k){ if(ROOM) IS.remove(ROOM); RNPC=[]; RCUS=[]; RSTEAM=[]; P.ret={x:P.x,z:P.z,yaw:P.yaw}; if(k==='kot') kotRoom(); else officeRoom(k);
   IS.add(ROOM); P.mode='in'; P.room=k; if(k==='kot'&&P.carry){ P.carry=false; setTimeout(()=>toast('📦 Marchandise rangée dans la réserve. Merci patron !'),500); } P.x=0; P.z=RDp/2-1.2; P.yaw=Math.PI; document.getElementById('cplace').textContent=k==='kot'?'🍟 '+S().name:OFF[k].ic+' '+OFF[k].n; snd(520); if(TARGET===k) TARGET=null; fade(); if(k==='kot'&&st&&servOpen()&&Math.max(waiting(),st.hLost||0)>0) setTimeout(()=>toast('🙋 Des clients attendent : passe derrière le comptoir pour les servir toi-même !'),900); }
 function exitRoom(){ P.mode='out'; P.x=P.ret.x; P.z=P.ret.z; P.yaw=P.ret.yaw+Math.PI; P.cam=P.yaw+Math.PI; document.getElementById('cplace').textContent='Grand-Place'; snd(420); fade(); }
 function fade(){ const f=document.getElementById('cfade'); f.style.transition='none'; f.style.opacity=1; requestAnimationFrame(()=>{ f.style.transition='opacity .45s'; f.style.opacity=0; }); }
@@ -1785,6 +1876,7 @@ function frame(t,mode){
     else { actB.style.display=NEAR?'block':'none'; if(NEAR&&actB.textContent!==NEAR.label) actB.textContent=NEAR.label; } }
   let scene=CS;
   if(inside){ scene=IS; RD.toneMappingExposure=.8; if(ME.parent!==IS) IS.add(ME); RNPC.forEach(m=>anim(m,dt,false));
+    if(RSTEAM.length) steamTick(RSTEAM,dt,!!st&&servOpen());
     if(RCUS.length){ const n=st&&servOpen()?Math.min(3,waiting()+(st.hLost||0)):0; RCUS.forEach((m,i)=>{ m.visible=i<n; if(m.visible) anim(m,dt,false); }); }
     cam.fov=50; cam.updateProjectionMatrix(); cam.position.set(P.x*.5,5.4,RDp/2+5); cam.lookAt(P.x*.5,.9,P.z*.3-.6); }
   else {
@@ -1802,7 +1894,8 @@ function frame(t,mode){
     cobM.roughness=wx==='rain'?.5:1; cobM.color.set(wx==='rain'?0x6e6e6e:0xffffff); sideM.roughness=cobM.roughness; sideM.color.copy(cobM.color); asphM.roughness=wx==='rain'?.3:.92;
     // lampadaires proches = vraies lumières
     if(t-lampT>500){ lampT=t; const ref=mode==='city'?P:{x:FP.x,z:FP.z}; nearestLamps(ref.x,ref.z).forEach((v,i)=>LPOOL[i].position.copy(v)); }
-    LPOOL.forEach(l=>l.intensity=lit?22:0); const kl=CS.userData.kotLight; if(kl) kl.intensity=lit?18:(servOpen()?3:0);
+    LPOOL.forEach(l=>l.intensity=lit?22:0); const kl=CS.userData.kotLight; if(kl) kl.intensity=lit?7:(servOpen()?2:0);
+    if(kotG&&kotG.userData.steam) steamTick(kotG.userData.steam,dt,mode==='intro'||servOpen());
     // drapeaux qui ondulent
     for(const f of FLAGS){ const p=f.geometry.attributes.position, b=f.userData.base; for(let i=0;i<p.count;i++){ const x=b[i*3]+.9; p.setZ(i,Math.sin(x*3-t/260+f.position.x)*.12*x); } p.needsUpdate=true; f.geometry.computeVertexNormals(); }
     const hn=CS.userData.hands; if(hn){ hn.rotation.z=-(h%12)/12*TAU; hn.children[1].rotation.z=-((h%1)*TAU-(h%12)/12*TAU); }
@@ -1853,6 +1946,7 @@ if(GLTFLoader&&USEPH){ const GL=new GLTFLoader(); GL.setMeshoptDecoder(MeshoptDe
   const LIST=['street_lamp_01','street_lamp_02','metal_trash_can','utility_box_01','outdoor_table_chair_set_01','security_camera_01','planter_box_01','standing_chalkboard_01','CashRegister_01','WetFloorSign_01','plastic_crate_01','cardboard_box_01','wooden_crate_01','classic_laptop','potted_plant_02','potted_plant_04','dining_chair_02','metal_office_desk','modern_ceiling_lamp_01','painted_wooden_bench','steel_frame_shelves_01'];
   if(SKU) loadChars(GL);
   Promise.all(LIST.map(n=>GL.loadAsync(ASSET+'m/'+n+'.glb').then(g=>{ g.scene.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } }); if(n==='steel_frame_shelves_01') g.scene.scale.setScalar(.1); MOD[n]=g.scene; }).catch(()=>{}))).then(outdoorModels); }
+setTimeout(foodIcons,300);
 // gestes du patron (mode 3D) : tâche avec animation, geste ponctuel, porter la marchandise
 let CARRY=null;
 function task(label,an,dur,fn,prop){ P.busy={label,t:dur,end:performance.now()+dur*1000,fn}; pose(ME,an,dur+1); if(prop==='mop'){ const hd=ME.userData.real&&ME.userData.real.getObjectByName('hand_r'); if(hd){ const g=new THREE.Group(); const st1=mesh(new THREE.CylinderGeometry(.015,.015,1.3,6),woodM); st1.position.y=-.15; g.add(st1); const hdm=box(.3,.06,.12,M(0x2a64c9,.6)); hdm.position.y=-.8; g.add(hdm); hd.add(g); P.busy.prop=g; } } snd(500); }
@@ -1865,7 +1959,7 @@ if(typeof render==='function'&&st&&playing) render();
 <script>
 // ====== Version, mises à jour, installation (même système que Route Nette) ======
 // Version du jeu : à changer à chaque mise à jour, avec la même valeur dans version.json.
-var APPV='2026-11-13.11';
+var APPV='2026-11-13.12';
 var SWR=null,BIP=null;
 var say=function(t){try{toast(t)}catch(x){}};
 document.getElementById('vlab').textContent='Version '+APPV;
