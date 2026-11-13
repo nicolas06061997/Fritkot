@@ -44,11 +44,17 @@ Mise à jour à chaque version. ✅ = fait et testé · 🔧 = à corriger · �
 - ✅ Clients difficiles (avis sévères) et généreux (gros pourboires) ; budget par client (trop cher = mécontent, avis).
 - ✅ Enfants avec certains clients dans la file (plus petits, animés).
 - ✅ File plus espacée (les clients ne se chevauchent plus).
+### Lot visuel (version 2026-11-13.16) — inspiré des photos du joueur
+- ✅ Cuisine pro : carrelage métro blanc brillant, sol en carreaux orange, inox brossé, comptoir inox avec bandeau de couleur, lampes industrielles suspendues, spot chaud avec ombres.
+- ✅ Objets réels : écran des commandes (mis à jour en direct), flacons de sauce, bacs d'ingrédients (salade, tomates, cheddar, oignons), planche à découper, casserole, caisses de pommes de terre, bidon d'huile, extincteur, tabourets, poster.
+- ✅ Guirlande d'ampoules chaudes sous l'auvent (le soir), personnel en casquette aux couleurs choisies.
 
 ## 🔧 À corriger / surveiller
 - 🔧 Avertissement three.js « Texture marked for update but no image data » (existant, sans effet visible).
 - 🔧 Avertissement « parameter 'color' undefined » dans le grossiste (existant, sans effet visible).
 - 🔧 Vêtements peints sur les corps : un peu moulants (prévoir de vrais vêtements 3D).
+- 🔧 Éblouissement encore un peu fort au centre de la baraque la nuit.
+- 🔧 Écart avec les photos (jeux PC sur moteur Unreal) : continuer pièce par pièce (vrais vêtements, visages, objets de cuisine 3D sur mesure).
 - 🔧 Tester les performances sur un vrai téléphone Android d'entrée de gamme.
 
 ## 🔜 Prochaines étapes (ordre prévu)
