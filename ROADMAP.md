@@ -33,6 +33,13 @@ Mise à jour à chaque version. ✅ = fait et testé · 🔧 = à corriger · �
 - ✅ Personnalisation : couleurs du fritkot, uniformes du personnel, lumière de l'enseigne.
 - ✅ Économie : 3 fournisseurs (discount, horeca, producteurs locaux), formations du personnel.
 - ✅ Sons : friteuse qui crépite, rue, pluie, foule, caisse, petite valse musette générée (réglable).
+### Lot 4 (version 2026-11-13.14)
+- ✅ Défis du jour (3 par jour d'ouverture, récompenses, bonus et série de jours).
+- ✅ Avis Google fictifs selon la qualité, l'attente, les prix et la propreté ; la note moyenne influence le nombre de clients.
+- ✅ Pannes de machines (friteuse, frigo, terminal, hotte) : réparateur ou réparation soi-même en 3D (animation à genoux, 65 % de réussite) ; contrat d'entretien ; fumée noire au-dessus de la friteuse en panne.
+- ✅ Clients qui mangent sur place (terrasse ou mange-debout) avant de repartir.
+- ✅ Zoom de la caméra (pincer à deux doigts, molette).
+- ✅ Plateau qui se garnit sur le comptoir pendant qu'on compose la commande.
 
 ## 🔧 À corriger / surveiller
 - 🔧 Avertissement three.js « Texture marked for update but no image data » (existant, sans effet visible).
@@ -41,19 +48,15 @@ Mise à jour à chaque version. ✅ = fait et testé · 🔧 = à corriger · �
 - 🔧 Tester les performances sur un vrai téléphone Android d'entrée de gamme.
 
 ## 🔜 Prochaines étapes (ordre prévu)
-1. Clients qui mangent sur la terrasse / mange-debout puis repartent ; enfants dans les familles.
-2. Pannes de machines (friteuse, frigo) et réparateur ; avis Google fictifs ; défis du jour avec récompenses.
-3. Sauces versées et pains garnis en 3D pendant la préparation (étapes visibles au comptoir).
-4. Tables, chaises et décoration à placer ; panneaux publicitaires ; nouveaux styles de fritkot.
-5. Caméra avec zoom (pincer) ; mode paysage.
+1. Enfants dans les familles ; clients « difficiles » et « généreux » ; budget par client.
+2. Préparation encore plus visuelle : sauce versée, pain de mitraillette garni, emballage.
+3. Tables, chaises et décoration à placer ; panneaux publicitaires ; nouveaux styles de fritkot.
+4. Employés autonomes visibles en 3D (ils servent, cuisent, nettoient) avec fatigue et efficacité.
+5. Mode paysage ; écran de chargement soigné ; tutoriel guidé.
 6. Deuxième établissement, puis chaîne belge.
 
 ## 💡 Plus tard
 - Tables et chaises à placer, décoration intérieure, panneaux publicitaires.
-- Clients qui mangent sur la terrasse puis repartent.
-- Pannes de machines et réparateur.
-- Avis Google fictifs, défis du jour avec récompenses.
-- Caméra avec zoom (pincer), mode paysage.
 - Livraison, deuxième établissement, chaîne belge, franchises.
 - Radio avec plusieurs stations.
 - Animaux (chiens, pigeons) et petits événements de rue (marché, brocante, carnaval).
