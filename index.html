@@ -113,8 +113,15 @@ nav#tabs button.on{color:var(--ye);background:#3a2615}
 #joy i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe36b,#e0a000);box-shadow:0 4px 10px rgba(0,0,0,.4)}
 #cact{display:none;position:absolute;right:16px;bottom:calc(env(safe-area-inset-bottom) + 50px);max-width:56%;border:0;border-radius:16px;padding:14px 16px;font-weight:900;font-size:15px;background:linear-gradient(180deg,var(--ye2),var(--ye));color:#2a1600;box-shadow:0 4px 0 #a87a00,0 8px 20px rgba(0,0,0,.4)}
 #chelp{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 175px);transform:translateX(-50%);background:rgba(20,10,4,.7);border-radius:12px;padding:6px 12px;font-size:12.5px;white-space:nowrap;transition:opacity 1s;pointer-events:none}
-#upd.on,#ins.on{display:block!important}
-#upd,#ins{display:none;position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom) + 70px);z-index:60;background:#3a2615;border:1px solid var(--ye);border-radius:14px;padding:10px 12px;box-shadow:var(--sh);max-width:740px;margin:auto}
+#upd.on{display:block!important}
+#ins.on{display:flex!important}
+#ins{display:none;position:fixed;inset:0;z-index:80;background:rgba(10,5,2,.82);align-items:center;justify-content:center;padding:16px}
+#ins .ib{background:#3a2615;border:2px solid var(--ye);border-radius:22px;padding:22px 18px;max-width:360px;width:100%;text-align:center;box-shadow:var(--sh)}
+#ins .ib img{width:96px;height:96px;border-radius:22px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+#ins .ib h2{margin:10px 0 4px;font-size:24px}
+#ins .ib .btn{width:100%;font-size:18px;padding:14px;margin-top:14px}
+#ins .ib .s{font-size:14px;padding:10px;margin-top:8px}
+#upd{display:none;position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom) + 70px);z-index:60;background:#3a2615;border:1px solid var(--ye);border-radius:14px;padding:10px 12px;box-shadow:var(--sh);max-width:740px;margin:auto}
 .seg{display:flex;background:#21150a;border-radius:12px;padding:3px;gap:3px;margin-bottom:10px;overflow-x:auto}
 .seg button{flex:1;border:0;background:none;color:var(--mut);font-weight:800;font-size:13px;padding:7px 6px;border-radius:9px;white-space:nowrap}
 .seg button.on{background:var(--ye);color:#2a1600}
@@ -144,7 +151,7 @@ nav#tabs button.on{color:var(--ye);background:#3a2615}
 <div id="modal"><div class="box" id="mbox"></div></div>
 <div id="toast"></div>
 <div id="upd"><div class="row"><div class="sp"><b>🎉 Nouvelle mise à jour disponible</b><div class="mut sm" id="updn"></div></div><button class="btn sm" onclick="doUpdate()">Mettre à jour</button></div></div>
-<div id="ins"><div class="row"><div class="sp"><b>📲 Installer Fritkot</b><div class="mut sm" id="insm"></div></div><button class="btn sm" id="insb" onclick="doIns()">Installer</button><button class="btn s sm" onclick="insLater()" aria-label="Plus tard">✕</button></div></div>
+<div id="ins" onclick="if(event.target===this&&BIP)doIns()"><div class="ib"><img src="icons/icon-192.png" alt=""><h2>Fritkot</h2><div class="mut" id="insm"></div><button class="btn" id="insb" onclick="doIns()">📲 Installer</button><button class="btn s" onclick="insLater()">Jouer sans installer</button></div></div>
 <div id="start">
   <div class="big">🍟</div>
   <h1>Fritkot</h1>
@@ -1677,7 +1684,7 @@ if(typeof render==='function'&&st&&playing) render();
 <script>
 // ====== Version, mises à jour, installation (même système que Route Nette) ======
 // Version du jeu : à changer à chaque mise à jour, avec la même valeur dans version.json.
-var APPV='2026-11-13.7';
+var APPV='2026-11-13.8';
 var SWR=null,BIP=null;
 var say=function(t){try{toast(t)}catch(x){}};
 document.getElementById('vlab').textContent='Version '+APPV;
@@ -1700,23 +1707,25 @@ function isAndroid(){return /Android/i.test(navigator.userAgent)}
 function isChrome(){var u=navigator.userAgent;return !inApp()&&/Chrome\//.test(u)&&!/EdgA?\/|OPR\/|SamsungBrowser|HuaweiBrowser|HeyTapBrowser|MiuiBrowser|YaBrowser|Firefox|FxiOS|CriOS/.test(u)}
 function startShown(){return document.getElementById('start').style.display!=='none'}
 function showIns(force){if(standalone()||document.getElementById('upd').classList.contains('on'))return;
- if(!force){try{if(Date.now()-(+localStorage.getItem('fritkot-ins')||0)<3*864e5)return}catch(x){}}
+ if(!force){try{if(sessionStorage.getItem('fritkot-ins'))return}catch(x){}}
  var m=document.getElementById('insm'),b=document.getElementById('insb');
- if(BIP){m.textContent='Ajoute le jeu sur ton écran d’accueil, en un appui.';b.textContent='Installer';b.style.display=''}
- else if(isAndroid()){m.textContent=isChrome()?'Menu ⋮ → « Installer l’application ». Pas dans le menu ? Ouvre d’abord dans Chrome.':'Ce navigateur ne peut pas installer le jeu : ouvre-le dans Chrome.';b.textContent='Ouvrir dans Chrome';b.style.display=''}
+ if(BIP){m.textContent='Installe le jeu sur ton téléphone, comme une vraie appli. Gratuit, ta progression est gardée.';b.textContent='📲 Installer';b.style.display=''}
+ else if(isAndroid()){m.textContent='Pour l’installer comme une appli, ouvre le jeu dans Chrome : l’installation se lancera là-bas.';b.textContent='📲 Ouvrir dans Chrome et installer';b.style.display=''}
  else if(inApp()){m.textContent='Tu es dans le navigateur d’une messagerie : ouvre le jeu dans Safari pour l’installer.';b.textContent='Copier le lien';b.style.display=''}
  else if(isIOS()){m.textContent='Dans Safari : touche Partager ⬆️ puis « Sur l’écran d’accueil ».';b.style.display='none'}
  else{m.textContent='Ce navigateur ne peut pas l’installer : copie le lien et ouvre-le dans Chrome.';b.textContent='Copier le lien';b.style.display=''}
  document.getElementById('ins').classList.add('on')}
-function insLater(){try{localStorage.setItem('fritkot-ins',Date.now())}catch(x){}document.getElementById('ins').classList.remove('on')}
+function insLater(){try{sessionStorage.setItem('fritkot-ins',1)}catch(x){}document.getElementById('ins').classList.remove('on')}
 function doIns(){if(BIP){var e=BIP;BIP=null;e.prompt();e.userChoice.then(function(c){if(c&&c.outcome==='accepted')document.getElementById('ins').classList.remove('on');else insLater()}).catch(function(){});return}
  var u=location.href.split('#')[0];
  if(isAndroid()){location.href='intent://'+u.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='+encodeURIComponent(u)+';end';return}
  (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(function(){say('Lien copié ✓ Colle-le dans Chrome')}).catch(function(){prompt('Copie ce lien et ouvre-le dans Chrome :',u)})}
 addEventListener('beforeinstallprompt',function(e){e.preventDefault();BIP=e;if(startShown())showIns()});
+// Messenger/Facebook/Instagram… sur Android : on ouvre directement le jeu dans Chrome (une fois), où l'installation est possible
+(function(){if(standalone()||!isAndroid()||!inApp())return;try{if(sessionStorage.getItem('fk-chr'))return;sessionStorage.setItem('fk-chr',1)}catch(x){}setTimeout(doIns,300)})();
 addEventListener('appinstalled',function(){BIP=null;document.getElementById('ins').classList.remove('on');say('Jeu installé ✓')});
 (function(){var p=document.getElementById('insp');if(p&&!standalone())p.style.display=''})();
-setTimeout(function(){if(BIP||standalone()||!startShown())return;showIns()},3500);
+setTimeout(function(){if(BIP||standalone()||!startShown())return;showIns()},isAndroid()?1500:600);
 </script>
 
 </body>
