@@ -40,6 +40,10 @@ Mise à jour à chaque version. ✅ = fait et testé · 🔧 = à corriger · �
 - ✅ Clients qui mangent sur place (terrasse ou mange-debout) avant de repartir.
 - ✅ Zoom de la caméra (pincer à deux doigts, molette).
 - ✅ Plateau qui se garnit sur le comptoir pendant qu'on compose la commande.
+### Lot 5 (version 2026-11-13.15)
+- ✅ Clients difficiles (avis sévères) et généreux (gros pourboires) ; budget par client (trop cher = mécontent, avis).
+- ✅ Enfants avec certains clients dans la file (plus petits, animés).
+- ✅ File plus espacée (les clients ne se chevauchent plus).
 
 ## 🔧 À corriger / surveiller
 - 🔧 Avertissement three.js « Texture marked for update but no image data » (existant, sans effet visible).
@@ -48,12 +52,11 @@ Mise à jour à chaque version. ✅ = fait et testé · 🔧 = à corriger · �
 - 🔧 Tester les performances sur un vrai téléphone Android d'entrée de gamme.
 
 ## 🔜 Prochaines étapes (ordre prévu)
-1. Enfants dans les familles ; clients « difficiles » et « généreux » ; budget par client.
-2. Préparation encore plus visuelle : sauce versée, pain de mitraillette garni, emballage.
-3. Tables, chaises et décoration à placer ; panneaux publicitaires ; nouveaux styles de fritkot.
-4. Employés autonomes visibles en 3D (ils servent, cuisent, nettoient) avec fatigue et efficacité.
-5. Mode paysage ; écran de chargement soigné ; tutoriel guidé.
-6. Deuxième établissement, puis chaîne belge.
+1. Préparation encore plus visuelle : sauce versée, pain de mitraillette garni, emballage.
+2. Tables, chaises et décoration à placer ; panneaux publicitaires ; nouveaux styles de fritkot.
+3. Employés autonomes visibles en 3D (ils servent, cuisent, nettoient) avec fatigue et efficacité.
+4. Mode paysage ; écran de chargement soigné ; tutoriel guidé.
+5. Deuxième établissement, puis chaîne belge.
 
 ## 💡 Plus tard
 - Tables et chaises à placer, décoration intérieure, panneaux publicitaires.

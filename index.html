@@ -926,6 +926,8 @@ const CTYPE={
   fam:{n:'Famille',ic:'👨‍👩‍👧',w:12,pat:26,tip:1.5,mul:3,hi:['Bonsoir ! C’est pour toute la famille.','Les enfants ont faim !']},
   tou:{n:'Touriste',ic:'📸',w:9,pat:24,tip:2.2,hi:['Hello ! C’est ici les vraies frites belges ?','Bonjour ! On nous a dit que c’était le meilleur fritkot !']},
   ouv:{n:'Ouvrier du chantier',ic:'🦺',w:14,pat:15,tip:1,hi:['Une grosse faim, patron !','Après le chantier, rien de tel !']},
+  dif:{n:'Client(e) difficile',ic:'😒',w:10,pat:14,tip:.4,hi:['J’espère que ce sera mieux que la dernière fois…','Et je veux des frites bien chaudes, hein !']},
+  gen:{n:'Client(e) généreux(se)',ic:'🤑',w:7,pat:22,tip:3.2,hi:['Bonsoir ! Gardez la monnaie, chef !','Ça sent tellement bon ici !']},
   cri:{n:'Critique gastronomique',ic:'🧐',w:4,pat:20,tip:0,hi:['Hmm. Voyons voir ce que vaut cette friterie…']},
 };
 function pickType(){ const L=Object.entries(CTYPE).filter(([k])=>k!=='cri'||st.rep>45); let r=R()*L.reduce((a,[,T])=>a+T.w,0); for(const [k,T] of L){ r-=T.w; if(r<=0) return k; } return 'hab'; }
@@ -938,7 +940,8 @@ function newOrder(){ const back=(st.fid||[]).filter(f=>f.s>=35&&f.d!==st.day&&f.
   if(ty==='ouv'){ it=['fg','sa',onMenu('fs')&&R()<.4?'fs':'sn']; if(R()<.7) it.push('bv'); }
   if(ty==='tou') it=onMenu('mi')&&st.stock.pain>=1?['mi']:['fg','sa'].concat(R()<.5?['bv']:[]);
   it=[...new Set(it)];
-  ORD={items:it,ty,mul:T.mul||1,n:ret?ret.n:pick(CNAMES),ret:ret?{v:ret.v,s:ret.s}:null,sa:pick(SAUCES),sn:pick(SNACKS),bv:pick(DRINKS),hi:pick(T.hi),tray:{},t0:performance.now(),pat:T.pat*(st.tired>80?.85:1)}; }
+  const cost=it.reduce((a,k)=>a+st.price[k],0)*(T.mul||1), bud=cost*({etu:.95,dif:1.05,gen:1.6,tou:1.4,fam:1.15}[ty]||1.25)*(.85+R()*.3)*(st.price.fm>MENU.fm.r*1.2?.92:1);
+  ORD={items:it,ty,mul:T.mul||1,bud,cost,n:ret?ret.n:pick(CNAMES),ret:ret?{v:ret.v,s:ret.s}:null,sa:pick(SAUCES),sn:pick(SNACKS),bv:pick(DRINKS),hi:pick(T.hi),tray:{},t0:performance.now(),pat:T.pat*(st.tired>80?.85:1)}; }
 function serveUI(){ if(!st) return; if(!servOpen()) return toast(isOpen(st.day)?'Le service n’a pas lieu à cette heure-ci (11 h-14 h et 17 h-23 h).':'La friterie est fermée aujourd’hui.');
   if(!waiting()&&!st.hLost) return toast('Personne au comptoir pour le moment 👍'); if(!ORD) newOrder(); snd(600); openServe(); if(window.CITY&&CITY.pose) CITY.pose('Idle_Talking_Loop',1.5); }
 function openServe(){ panel(serveBody); clearInterval(SRVIV); SRVIV=setInterval(()=>{ if(!ORD||MODALF!==serveBody){ clearInterval(SRVIV); return; } const b=document.getElementById('patb'); const left=1-(performance.now()-ORD.t0)/1000/ORD.pat; if(b) b.style.width=Math.max(0,left*100)+'%'; if(b) b.style.background=left>.5?'#5fdc7a':left>.25?'#ffc928':'#ff5d57'; if(left<=0) serveLeave(); },100); }
@@ -953,7 +956,7 @@ function serveBody(){ if(!ORD) return '<div class="mut">Personne au comptoir.</d
   if(o.ret) h+='<div class="tag" style="margin-top:8px">🔁 '+(o.ret.v+1)+'e visite · la dernière fois : '+satTxt(o.ret.s)+'</div>';
   const nd=needOf(o), K=kit(); h+='<div class="mut sm" style="margin-top:8px">Au chaud : 🍟 <b style="color:'+(K.fr<nd.fr?'var(--rd)':'var(--gr)')+'">'+K.fr+'</b> portions'+(onMenu('bu')?' · 🥩 <b style="color:'+(K.pa<nd.pa?'var(--rd)':'var(--gr)')+'">'+K.pa+'</b> steaks':'')+' · il faut '+nd.fr+(nd.pa?' + '+nd.pa+' steak(s)':'')+'</div>';
   h+='<div class="card" style="margin-top:10px"><div class="mut sm">« '+esc(o.hi)+' »</div><div style="font-size:17px;margin-top:6px">💬 « '+esc(orderTalk(o))+' »</div></div>';
-  h+='<div class="mut sm" style="margin:6px 0">Compose le plateau puis sers avant que la jauge de patience soit vide.</div><div class="tags" style="gap:8px">';
+  h+='<div class="mut sm" style="margin:6px 0">Total : <b>'+fmt2(o.cost)+'</b> · budget du client : '+(o.bud>=o.cost?'<span style="color:var(--gr)">ça va 👍</span>':'<span style="color:var(--rd)">trop cher pour lui 😬</span>')+' · Compose le plateau puis sers avant que la jauge soit vide.</div><div class="tags" style="gap:8px">';
   for(const k of keys){ const on=o.tray[k]; h+='<button id="tr_'+k+'" class="btn sm '+(on?'':'s')+'" style="flex:1 1 30%;min-width:96px;display:flex;align-items:center;gap:6px;justify-content:center" onclick="trayT(\''+k+'\')"><i style="font-style:normal">'+(on?'✅':'')+'</i>'+fimg(k,28)+' '+MENU[k].n.split(' (')[0]+'</button>'; }
   h+='</div><div class="row" style="margin-top:12px"><button class="btn" onclick="serveGo()">🍟 Servir</button><button class="btn s" onclick="clearInterval(SRVIV);ORD=null;closeModal()">Plus tard</button></div>';
   return h; }
@@ -970,7 +973,10 @@ function serveGo(){ const o=ORD; if(!o) return; const nd=needOf(o), K=kit();
     else st.rep=Math.min(100,st.rep+(o.ty==='hab'?.06:.04));
     AMB.kaching(); toast(msg); }
   else { st.rep=Math.max(0,st.rep-(o.ty==='pre'||o.ty==='cri'?.2:.08)); snd(220); toast('😕 Oups ! '+o.n+' voulait : '+o.items.map(k=>MENU[k].n.split(' (')[0].toLowerCase()).join(', ')); }
-  fidUpd(o.n,o.ty,ok?(sec<o.pat*.5?18:10):-25);
+  if(o.cost>o.bud){ st.rep=Math.max(0,st.rep-.05); setTimeout(()=>toast('💸 '+o.n+' trouve ça trop cher…'),1800); if(R()<.25) addRev(o.n,2,'Les prix ont bien augmenté, c’est devenu cher pour des frites.'); }
+  if(o.ty==='dif'&&!ok){ st.rep=Math.max(0,st.rep-.25); if(R()<.6) addRev(o.n,1,'Commande ratée. Inadmissible !'); }
+  if(o.ty==='dif'&&ok&&sec<o.pat*.5&&R()<.4) addRev(o.n,5,'Exigeant(e), mais là rien à dire : parfait et rapide.');
+  fidUpd(o.n,o.ty,(ok?(sec<o.pat*.5?18:10):-25)-(o.cost>o.bud?12:0));
   if(window.CITY&&CITY.pose) CITY.pose('Interact',1.4);
   ORD=null; headerOnly(); chalCheck(); if(Math.max(waiting(),st.hLost)>0&&servOpen()){ newOrder(); openServe(); } else closeModal(); }
 // image 3D d'un produit (rendue par le moteur graphique), sinon l'émoji
@@ -1727,7 +1733,7 @@ function human(o){
   if(o.staff){ const hat=mesh(new THREE.CylinderGeometry(.16,.18,.22,16),M(0xffffff,.7)); hat.position.y=.2; hd.add(hat); const ap=box(.4,.55,.03,M(0xc81e1e,.8)); ap.position.set(0,1.05,.16); body.add(ap); }
   if(o.suit){ const tie=box(.055,.3,.02,M(0x7a1f1f,.5)); tie.position.set(0,1.3,.155); body.add(tie); }
   g.userData={lL,lR,aL,aR,body,hd,ph:Math.random()*10,o}; if(CH.ok) realize(g); else CH.wait.push(g); return g; }
-function anim(m,dt,mv,sp){ const u=m.userData;
+function anim(m,dt,mv,sp){ const u=m.userData; if(u.kid) anim(u.kid,dt,mv,(sp||1)*1.15);
   if(u.mix){ if(u.once){ u.onceT-=dt; if(u.onceT<=0) u.once=null; }
     play(m,u.once||(mv?(sp>1.2?'Jog_Fwd_Loop':'Walk_Loop'):(u.pose||'Idle_Loop')),.25,!u.once); u.mix.update(dt*(mv&&sp?Math.min(1.3,Math.max(.8,sp>1.2?sp/1.45:sp)):1)); return; }
   u.ph+=dt*(sp||1)*8.5; const s=mv?Math.sin(u.ph)*.62:0; u.lL.rotation.x=s; u.lR.rotation.x=-s; u.aL.rotation.x=-s*.75; u.aR.rotation.x=s*.75; u.body.position.y=mv?Math.abs(Math.cos(u.ph))*.035:Math.sin(u.ph*.12)*.006; if(!mv) u.hd.rotation.y=Math.sin(u.ph*.07)*.25; }
@@ -1827,7 +1833,9 @@ function buildKot(){
 }
 // clients (suivent la vraie file PPL du jeu) et passants
 const POOL=[]; for(let i=0;i<16;i++){ const m=human({skin:SKINS[i%5],top:TOPS[(i*5)%TOPS.length],hair:HAIRS[(i*2)%6],fem:i%2===0,pants:[0x2b3550,0x3a3a3a,0x5a4a3a][i%3]}); m.visible=false; CS.add(m);
-  const bx=foodModel(i%3?'fm':'fg'); bx.position.set(0,-.62,.1); m.userData.aR.add(bx); m.userData.fries=bx; pose(m,'Idle_Loop'); m.userData.basePose='Idle_Loop'; POOL.push(m); }
+  const bx=foodModel(i%3?'fm':'fg'); bx.position.set(0,-.62,.1); m.userData.aR.add(bx); m.userData.fries=bx; pose(m,'Idle_Loop'); m.userData.basePose='Idle_Loop';
+  if(i%4===1){ const kd=human({skin:SKINS[i%5],top:TOPS[(i*3+4)%TOPS.length],hair:HAIRS[(i+3)%6],fem:i%8===1,pants:0x3a5a8a,shoe:0xd83030}); kd.scale.setScalar(.6); kd.position.set(.42,0,.15); m.add(kd); m.userData.kid=kd; }
+  POOL.push(m); }
 const PM=new Map();
 const PEDS=[]; const LOOP=[[-17,-14],[17,-14],[17,14],[3,14],[2.5,44],[-2.5,44],[-3,14],[-17,14]];
 for(let i=0;i<10;i++){ const m=human({skin:SKINS[(i+2)%5],top:TOPS[(i*7)%TOPS.length],hair:HAIRS[(i+1)%6],fem:i%3===0}); m.userData.s=i/10; m.userData.v=.006+Math.random()*.003; CS.add(m); PEDS.push(m); }
@@ -2042,9 +2050,9 @@ function frame(t,mode){
     for(const p of (mode==='intro'?[]:PPL)){ let m=PM.get(p.id); if(!m){ m=POOL.find(x=>!x.visible); if(!m) continue; m.visible=true; PM.set(p.id,m); } seen.add(p.id);
       const k=Math.max(0,-(p.x-qx)/16); let x,z,mv=!p.q;
       if(p.st===2){ const SE=kotG.userData.SEATS||[]; const si=SE.length?Math.abs(Math.floor(p.id*1e6))%SE.length:0, se=SE[si]||[0,D/2+2,0]; m.position.set(FP.x+se[0],0,FP.z+se[1]); m.rotation.y=se[2]; m.userData.fries.visible=true; m.userData.pose='Consume'; anim(m,dt,false); continue; }
-      if(p.st===0){ x=FP.x-.3-k*.62; z=FP.z+D/2+1+k*.3; if(!p.q){ x=FP.x-.3-Math.max(k,0)*.62; } } else { x=FP.x+(p.x-qx)/16*.8; z=FP.z+D/2+2.6; }
+      if(p.st===0){ x=FP.x-.3-k*.8; z=FP.z+D/2+1+k*.42; if(!p.q){ x=FP.x-.3-Math.max(k,0)*.8; } } else { x=FP.x+(p.x-qx)/16*.8; z=FP.z+D/2+2.6; }
       m.position.set(x,0,Math.min(FP.z+D/2+6,z)); m.rotation.y=p.st===0&&p.q?Math.PI*.92:Math.PI/2; m.userData.fries.visible=p.st===1; if(p.st===1&&m.userData.pose==='Consume') m.userData.pose=null; if(p.st===0&&p.q){ m.userData.pose=p.w>32?'Idle_FoldArms_Loop':p.w>18?'Idle_TalkingPhone_Loop':m.userData.basePose||'Idle_Loop'; } anim(m,dt,mv&&speed>0,1); }
-    if(mode==='intro'){ const n=4; POOL.forEach((m,i)=>{ if(i<n){ m.visible=true; m.position.set(FP.x-.3-i*.62,0,FP.z+kotG.userData.D/2+1+i*.3); m.rotation.y=Math.PI*.92; m.userData.fries.visible=false; anim(m,dt,false); } else m.visible=false; }); }
+    if(mode==='intro'){ const n=4; POOL.forEach((m,i)=>{ if(i<n){ m.visible=true; m.position.set(FP.x-.3-i*.8,0,FP.z+kotG.userData.D/2+1+i*.42); m.rotation.y=Math.PI*.92; m.userData.fries.visible=false; anim(m,dt,false); } else m.visible=false; }); }
     else for(const [id,m] of PM) if(!seen.has(id)){ m.visible=false; PM.delete(id); }
     for(const m of PEDS){ m.userData.s+=m.userData.v*dt; const [x,z,r]=loopPos(m.userData.s); m.position.set(x,0,z); m.rotation.y=r; anim(m,dt,true); }
     for(const c of CARS){ const u=c.userData; u.s=(u.s+dt*u.v/80)%1; const z=u.dir<0?92-u.s*68:24+u.s*68; c.position.set(u.dir<0?-1.8:1.8,0,z); c.rotation.y=u.dir<0?Math.PI/2:-Math.PI/2; }
@@ -2098,7 +2106,7 @@ if(typeof render==='function'&&st&&playing) render();
 <script>
 // ====== Version, mises à jour, installation (même système que Route Nette) ======
 // Version du jeu : à changer à chaque mise à jour, avec la même valeur dans version.json.
-var APPV='2026-11-13.14';
+var APPV='2026-11-13.15';
 var SWR=null,BIP=null;
 var say=function(t){try{toast(t)}catch(x){}};
 document.getElementById('vlab').textContent='Version '+APPV;
