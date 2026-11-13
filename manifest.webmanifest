@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "Fritkot",
+  "short_name": "Fritkot",
+  "description": "Ouvre ta friterie en Belgique et deviens le roi de la frite.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#1c120a",
+  "theme_color": "#1c120a",
+  "categories": ["games"],
+  "icons": [
+    {"src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml"},
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

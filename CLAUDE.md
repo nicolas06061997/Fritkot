@@ -1,0 +1,38 @@
+# Fritkot
+
+Jeu mobile 2D (PWA) de gestion d'une friterie en Belgique : une baraque louée sur la place du village, puis friterie en dur, centre-ville, brasserie-friterie.
+Un seul fichier `index.html` (décor 3D Three.js 0.160 chargé depuis cdn.jsdelivr.net, mis en cache par `sw.js` ; police Google « Nunito »), publié par GitHub Pages depuis la branche `main`.
+Projet indépendant : **ne jamais toucher à Route Nette** (autre dépôt) ni mélanger le code.
+
+L'utilisateur parle français et n'est pas développeur : réponses courtes, en français, étape par étape.
+
+## À chaque modification du jeu
+1. Changer `APPV` (second `<script>` en bas de `index.html`) **et** `v` dans `version.json` (même valeur, format `AAAA-MM-JJ.n`). Mettre une phrase courte dans `notes`.
+2. Commit + push sur `main`.
+
+## Sauvegarde : ne JAMAIS faire perdre la progression
+- Clé `localStorage` `fritkot-save` (+ `fritkot-bak`, copie brute `fritkot-prev` à chaque ouverture). Ne jamais renommer ces clés.
+- Nouveau champ : l'ajouter dans `defaults()` ; `migrate()` complète les vieilles sauvegardes. Monter `SCHEMA` si une conversion est nécessaire.
+- Code de sauvegarde (export/import) et « 🛟 Copie d'avant » dans Gestion → Réglages.
+
+## Lancer
+`python3 -m http.server 8000` puis `http://localhost:8000/`.
+
+## Structure
+- Données : `STK` (stock, prix HTVA grossiste), `MENU` (carte, prix de référence belges 2026, consommation `use`), `LOC` (locaux), `EQ` (matériel), `ROLES` (personnel horeca CP 302), `WX` (météo), `WD` (jour de la semaine), `HC` (part des clients par heure), `GOALS`.
+- Temps : 1 heure de jeu = 600 ms (`HOUR_MS`), journée de 10 h à 23 h ; `stepTenth()` → `hourSim(h)` (clients servis/perdus selon `serveCap()` et `fryCap()`), `dayEnd()`/`dayStart()`, `monthStart()` (salaires, loyer, TVA, cotisations, impôt, vie privée 1 650 €).
+- Ventes : `sellOne()` compose un ticket (frite + sauce + snack + boisson, mitraillette), élasticité au prix `priceF`.
+- Qualité `quality()` : graisse (`st.oil` / `oilLife()`), propreté, friturier, sauces maison → réputation `st.rep`.
+- AFSCA `afsca()` ; événements `events()` (Diables Rouges, kermesse, travaux, mauvaise récolte de pommes de terre).
+- Argent : toujours `mv(montant, libellé, catégorie)` (catégories `CATN`), sauf les ventes dans `sellOne()`.
+- Coup de main : toucher la friterie sert un client parti l'heure d'avant (`st.hLost`).
+- Ne jamais écrire `click()` dans un attribut HTML `onclick` (piège déjà rencontré dans Route Nette) : le son s'appelle `snd()`.
+- Lot 1 : démarches `ADM` (BCE, AFSCA, commune, assurance ; `admOk()` dans `isOpen`, vieilles parties = tout fait), recette `POT`/`FAT` (`stkPc(k)` = prix du stock), fatigue du patron `st.tired` (`tiredF()`, vacances `vacation()`, burn-out à 100), portraits `avatar(nom,taille)` + CV `cvOf`/`cvUI`/`interview` (impression juste 3 fois sur 4), motivation cachée `w.base`/`w.mot`, prime, rapports `st.rpts` (`weekReports`, `rptAct`), décisions du patron `DEC` (`decTick` 3,5 %/jour, max 2, 15 jours, sinon dernier choix), historique mensuel `st.mHist` (`bars()`).
+- **Moteur graphique réaliste** (un seul `<script type="module">`, `importmap` dans `<head>` : `three` et `three/addons/` sur cdn.jsdelivr.net, mis en cache par `sw.js`) : un seul rendu WebGL pour 3 modes (`CITY.frame(t,mode)` depuis `loop()`) : `intro` (cinématique au coucher du soleil derrière l'écran « Jouer », classe `body.d3intro`), `banner` (le canvas `#cc` est déplacé dans `#scene`, caméra fixe sur la friterie, `window.CAMA` = glisser ; `#cv` reste par-dessus pour les touches et `drawFx`), `city` (plein écran `#city`). Si l'import ou WebGL échoue, l'ancien décor 2D `draw()` reste.
+  - Rendu : ACES, ciel physique `Sky` + environnement PMREM recalculé tous les quarts d'heure (`updSky`), `RoomEnvironment` à l'intérieur, ombres douces, brouillard `FogExp2`, post-traitement `EffectComposer` (bloom `UnrealBloomPass`, GTAO en ultra) via `compFor(scene)`. Qualité `fk-q` low/med/high/ultra (téléphone = high, PC = ultra, bouton « Graphismes » dans Réglages = `togQ()`), résolution adaptative `DYN` si le téléphone rame.
+  - Matériaux PBR procéduraux (`nrm()` = carte de relief depuis un canvas) : briques `bricks(couleur)` (512 px = 2 m, UV en mètres `boxUV`), pavés `cobM` (mouillés sous la pluie), tuiles/ardoises `roofMat`, bois, carrelage `tileFloor`, inox `steel`, pierre bleue `blueStone`. Fenêtres, portes, seuils, volets en `InstancedMesh` (`windowAt`, `inst`, `buildInstances`) ; fenêtres allumées la nuit = `NIGHT` (userData `lamp`/`neon`/`sign`).
+  - Ville : `OFFB` + `row()` (maisons `house()` avec pignons à gradins, lucarnes, cheminées), hôtel de ville (horloge qui tourne, drapeaux qui ondulent), église, grossiste, fontaine (gouttes `DROPS`), arbres `tree()`, lampadaires `lamp()` (5 vraies lumières suivent le joueur `LPOOL`), bancs, voitures `carModel()` (peinture métallisée), nuages, étoiles, lune. Friterie `buildKot()` (enseigne néon, auvent ondulé, chevalet avec les prix). Clients = vraie file `PPL` (`POOL`, barquette de frites quand servis), passants `PEDS`.
+  - Personnages `human()` (yeux, sourcils, nez, cheveux, tablier/toque pour le personnel), PNJ `npcFor(nom)`. Intérieurs `IS` : `officeRoom(k)`, `grosRoom()`, `kotRoom()` (friteuses selon le matériel, huile qui noircit, tableau des prix `menuBoard()`, frigo vitré, personnel présent). Interactions `HOT`/`RHOT` → `officeUI(k)` / `stationUI(k)` (panneaux `panel(f)` rafraîchis par `render()`). Démarches dans les bureaux (`admRow`, `CITY.go(k)`, flèche `TARGET`). Mini-carte `#cmap`. Débogage `CITY._d`.
+  - Tests : le serveur de développement n'a pas accès à jsdelivr → `page.route('**/cdn.jsdelivr.net/**')` vers `npm pack three@0.160.0`, contexte avec `serviceWorkers:'block'`, Chromium `--use-angle=swiftshader` (≈ 5-10 images/s sans carte graphique).
+- **Vrais graphismes (Poly Haven, CC0, `assets/`, crédits dans `assets/CREDITS.md`)** : 16 textures photo `assets/t/<nom>_{diff,nor,arm}.webp` (1k, arm en 512) chargées par `phTex`/`phMat(nom,[répétition],options)` (arm = occlusion/rugosité/métal) si la sonde `USEPH` réussit (sinon textures dessinées). Briques par couleur `BMAP`, pavés `cobblestone_floor_08`, routes `asphalt_02`, tuiles `clay_roof_tiles_02`, ardoises `roof_slates_02`, pierre bleue `large_grey_tiles` teintée, bois `kitchen_wood`, écorce `bark_platanus`, sols intérieurs (damier `checkered_pavement_tiles`, `large_grey_tiles`, `oak_wood_planks`), murs `plastered_wall`. 21 modèles `assets/m/*.glb` (meshopt + WebP, 4 Mo au total) chargés par `GLTFLoader` dans `MOD`, placés par `mdl(nom,x,y,z,rot,échelle)` : `outdoorModels()` (lampadaires `street_lamp_01` à la place de `LAMPG`, lanternes murales près des portes, poubelles, armoires électriques, terrasses, caméra, jardinières) et dans les intérieurs (caisse, panneau sol glissant, caisses, carton, laptop, plantes, chaises, bureau, lampes, banc). Préparation : `gltf-transform optimize … --compress meshopt --texture-compress webp --texture-size 512` ; textures converties avec PIL. Les arbres Poly Haven (60-200 Mo) sont trop lourds.
+- Environnement cloud « Fritkot » : accès à api.polyhaven.com, dl.polyhaven.org, cdn.jsdelivr.net.
