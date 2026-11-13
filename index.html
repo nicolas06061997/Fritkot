@@ -1623,7 +1623,7 @@ let comp=null, bloom=null, gtao=null, compScene=null;
 function makeComp(scene){ if(!Q.post) return null; const rt=new THREE.WebGLRenderTarget(2,2,{type:THREE.HalfFloatType,samples:RD.capabilities.isWebGL2?4:0});
   const c=new EffectComposer(RD,rt); c.addPass(new RenderPass(scene,cam));
   if(Q.ao&&GTAOPass&&scene===CS){ try{ gtao=new GTAOPass(scene,cam,2,2); gtao.output=GTAOPass.OUTPUT.Default; gtao.blendIntensity=.85; gtao.updateGtaoMaterial({radius:.6,distanceExponent:1.5,thickness:1,scale:1.2}); c.addPass(gtao); }catch(e){ gtao=null; } }
-  const bl=new UnrealBloomPass(new THREE.Vector2(256,256),.35,.55,.82); c.addPass(bl); c.addPass(new OutputPass()); c.userData={bl};
+  const bl=new UnrealBloomPass(new THREE.Vector2(256,256),.22,.4,.88); c.addPass(bl); c.addPass(new OutputPass()); c.userData={bl};
   const W=cc.clientWidth||2, H=cc.clientHeight||2; c.setPixelRatio(RD.getPixelRatio()); c.setSize(W,H); bl.resolution.set(W/2,H/2); if(gtao) gtao.setSize(W*RD.getPixelRatio(),H*RD.getPixelRatio()); return c; }
 const COMP={}; function compFor(scene){ const k=scene===CS?'o':'i'; return COMP[k]===undefined?(COMP[k]=makeComp(scene)):COMP[k]; }
 // ---------- ciel et environnement selon l'heure ----------
@@ -1651,7 +1651,7 @@ function frame(t,mode){
   const dt=Math.min(.05,(t-(lt||t))/1000); lt=t;
   const W=cc.clientWidth, H=cc.clientHeight; if(!W||!H) return;
   // résolution adaptative : si le téléphone rame, on baisse un peu la netteté (et on remonte si tout va bien)
-  FT=FT*.95+dt*.05; if(t-dynT>2500){ dynT=t; if(FT>.042&&DYN>.55){ DYN-=.15; cc.dataset.m=''; } else if(FT<.022&&DYN<1){ DYN=Math.min(1,DYN+.1); cc.dataset.m=''; } }
+  FT=FT*.95+dt*.05; if(t-dynT>2500){ dynT=t; if(FT>.045&&DYN>.8){ DYN-=.1; cc.dataset.m=''; } else if(FT<.022&&DYN<1){ DYN=Math.min(1,DYN+.1); cc.dataset.m=''; } }
   const want=Math.min(Q.pr,devicePixelRatio||1)*DYN; if(cc.width!==Math.round(W*want)||cc.height!==Math.round(H*want)||cc.dataset.m!==mode){ cc.dataset.m=mode; RD.setPixelRatio(want); RD.setSize(W,H,false); cam.aspect=W/H; cam.updateProjectionMatrix(); for(const k in COMP) if(COMP[k]){ COMP[k].setPixelRatio(RD.getPixelRatio()); COMP[k].setSize(W,H); COMP[k].userData.bl.resolution.set(W/2,H/2); } if(gtao) gtao.setSize(W*RD.getPixelRatio(),H*RD.getPixelRatio()); }
   const key=[s.loc,s.name,!!(s.eq&&s.eq.terr)].join('|'); if(key!==kotKey){ kotKey=key; buildKot(); }
   const h=mode==='intro'?19.15+Math.sin(t/40000)*.15:s.h, wx=mode==='intro'?'sun':s.wx;
@@ -1742,7 +1742,7 @@ if(typeof render==='function'&&st&&playing) render();
 <script>
 // ====== Version, mises à jour, installation (même système que Route Nette) ======
 // Version du jeu : à changer à chaque mise à jour, avec la même valeur dans version.json.
-var APPV='2026-11-13.9';
+var APPV='2026-11-13.10';
 var SWR=null,BIP=null;
 var say=function(t){try{toast(t)}catch(x){}};
 document.getElementById('vlab').textContent='Version '+APPV;
